@@ -233,14 +233,14 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
                       payload["status"] as? String == "found" else { return }
                 let notifiedKey = "museum.zfxf.notified." + id
                 if !UserDefaults.standard.bool(forKey: notifiedKey) {
-                    UserDefaults.standard.set(true, forKey: notifiedKey)
                     let note = UNMutableNotificationContent()
                     note.title = "ZFxF · 附近有封信"
                     note.body = "一封提前藏好的信已经被发现。打开我们的秘密地图拆开它。"
                     note.sound = .default
-                    UNUserNotificationCenter.current().add(
-                        UNNotificationRequest(identifier: "zfxf-"+id, content: note, trigger: nil)
+                    try await UNUserNotificationCenter.current().add(
+                        UNNotificationRequest(identifier: "zfxf-" + id, content: note, trigger: nil)
                     )
+                    UserDefaults.standard.set(true, forKey: notifiedKey)
                 }
                 await refreshRegions()
             } catch {
