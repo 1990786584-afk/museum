@@ -1,0 +1,52 @@
+name: Museum preview — original UI only
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: museum-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pinned upstream submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sources/ephemera-date/web/package-lock.json
+      - name: Build the two original exhibitions
+        run: ./scripts/build-preview.sh /museum
+      - name: Save preview even if Pages is not enabled
+        uses: actions/upload-artifact@v4
+        with:
+          name: museum-preview
+          path: preview/
+          include-hidden-files: true
+          retention-days: 7
+      - name: Prepare Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: preview/
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://1990786584-afk.github.io/museum/
+    steps:
+      - name: Deploy GitHub Pages
+        uses: actions/deploy-pages@v4
