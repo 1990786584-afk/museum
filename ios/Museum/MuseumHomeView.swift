@@ -74,6 +74,19 @@ struct MuseumHomeView: View {
             // the photos just added there. No second upload needed.
             if !isOpen { browser.refreshPrivateGallery?() }
         }
+        .onChange(of: host.config.isConfigured) { _, connected in
+            // Disconnecting must also remove the one-hour WebKit gallery cookie.
+            guard !connected else { return }
+            browser.goHome()
+            browser.webView?.configuration.websiteDataStore.httpCookieStore
+                .getAllCookies { cookies in
+                    guard let webView = browser.webView else { return }
+                    let store = webView.configuration.websiteDataStore.httpCookieStore
+                    for cookie in cookies where cookie.name == "museum_sid" {
+                        store.delete(cookie)
+                    }
+                }
+        }
         .sheet(isPresented: $showConnection) {
             PrivateDatesSettings()
                 .environmentObject(host)
@@ -308,7 +321,8 @@ private struct MuseumBrowser: UIViewRepresentable {
 private struct PrivateDatesSettings: View {
     @EnvironmentObject private var host: HostState
     @Environment(\.dismiss) private var dismiss
-    @State private var origin = HostConfig.load().apiBase
+    @State private var origin = HostConfig.load().apiBase.isEmpty
+        ? "https://memory.ryanecho.xyz/date" : HostConfig.load().apiBase
     @State private var token = HostConfig.load().credential
     @State private var status = ""
     @State private var isChecking = false
