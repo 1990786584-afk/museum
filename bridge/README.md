@@ -31,7 +31,7 @@ Ephemera 的原始网页完全没有改。iOS 调用其 v1 原生嵌入协议，
 | 方法 | 路径 | 鉴权 | 用途 |
 |---|---|---|---|
 | POST | `/museum-gallery/sync` | Bearer (Ephemera her token) | 读取已完成约会并更新相册 |
-| POST | `/museum-gallery/session` | Bearer | 换取 1 小时 HttpOnly Secure SameSite=Strict cookie |
+| POST | `/museum-gallery/session` | Bearer | 换取 1 小时 HttpOnly Secure SameSite=Lax cookie |
 | GET | `/museum-gallery/` | session cookie | 原版云端相册 |
 | GET | `/museum-gallery/photos.json` | session cookie | 私有相册索引 |
 | GET | `/museum-gallery/photos/*` | session cookie | 私有原图 |
@@ -40,6 +40,8 @@ Ephemera 的原始网页完全没有改。iOS 调用其 v1 原生嵌入协议，
 
 浏览器没有 Bearer 的情况下连 `photos.json` 都拿不到（401）。
 iOS 口令在系统 Keychain，网页只得到短期 cookie。
+Lax 允许 iOS 从公开首页首次跳转私人相册时发送 cookie，
+同时仅 GET 被 cookie 接受；新增会话与同步必须使用 Bearer。
 照片从未经过 GitHub Pages／公开 `museum` 仓库。
 如果 `MUSEUM_PUBLIC_PREFIX=/date/museum-gallery`，Cookie 的 Path
 自动与 Nginx 的 `/date/` 代理路径一致。
@@ -68,7 +70,7 @@ python3 bridge/server.py
 - 每次同步生成新快照，使用 symlink 原子切换，保留最近 3 代以避免
   请求中的图片断开；磁盘数据不进行公开索引。
 - 正式关机/删 App/长期撤销权限时应单独决定如何清理快照。
-- Pillow 暂时不能解码的 HEIC/AVIF 照片会被记录到 `unsupported` 计数，
+- 服务器默认安装 pillow-heif 解码常见的 HEIC/AVIF。无法解码的少见格式会记录到 `unsupported` 计数，
   原图继续安全保留在 Ephemera，**不会被删除**。
 - 此处当前没有做多用户、云相册共享或远程定位。
 - 本项目与原来的 ZFxF 藏信地图完全隔离。

@@ -217,9 +217,23 @@ private struct MuseumBrowser: UIViewRepresentable {
                     syncReq.httpMethod = "POST"
                     syncReq.httpBody = Data()
                     syncReq.setValue("Bearer " + cfg.credential, forHTTPHeaderField: "Authorization")
-                    let (_, syncRes) = try await URLSession.shared.data(for: syncReq)
+                    let (syncData, syncRes) = try await URLSession.shared.data(for: syncReq)
                     guard (syncRes as? HTTPURLResponse)?.statusCode == 200 else {
                         throw URLError(.badServerResponse)
+                    }
+                    // Until the first actual date is finished, retain the
+                    // original full sample gallery instead of a blank cloud.
+                    if let summary = (try? JSONSerialization.jsonObject(with: syncData)) as? [String: Any],
+                       (summary["dates"] as? Int) == 0 {
+                        if !UserDefaults.standard.bool(forKey: "museum.emptyGalleryExplained") {
+                            UserDefaults.standard.set(true, forKey: "museum.emptyGalleryExplained")
+                            parent.onGalleryError(
+                                "私人纪念馆已经连接，但还没有结束的约会。这里先展示原作者的示例照片；以后约会完成、上传照片，就会自动同步进云里。"
+                            )
+                        }
+                        webView.load(URLRequest(url: URL(string:
+                            "https://1990786584-afk.github.io/museum/gallery/")!))
+                        return
                     }
 
                     var sessionReq = URLRequest(url: session, timeoutInterval: 20)

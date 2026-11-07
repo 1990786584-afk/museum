@@ -80,6 +80,18 @@ class SyncTest(unittest.TestCase):
         self.assertNotIn("/api/dates/9/her", self.api.paths)
         self.assertNotIn("/api/dates/12/her", self.api.paths)
 
+    def test_unchanged_photos_reuse_upstream_baked_originals(self):
+        self.sync()
+        current = (self.root / "current").resolve()
+        photo = current / "photos" / "2026-10-27_museum_box-7_photo-21.jpg"
+        before = photo.stat().st_ino
+        self.api.paths.clear()
+        self.sync()
+        current = (self.root / "current").resolve()
+        photo = current / "photos" / "2026-10-27_museum_box-7_photo-21.jpg"
+        self.assertEqual(before, photo.stat().st_ino)
+        self.assertNotIn("/api/dates/7/her/photo/21", self.api.paths)
+
     def test_deletions_do_not_leave_orphaned_gallery_photos(self):
         self.sync()
         self.api.photos = []
@@ -126,6 +138,7 @@ class SyncTest(unittest.TestCase):
             cookie = accepted.headers["Set-Cookie"]
         self.assertIn("HttpOnly", cookie)
         self.assertIn("Secure", cookie)
+        self.assertIn("SameSite=Lax", cookie)
         cookie = cookie.split(";", 1)[0]
         self.assertEqual(get("/photos.json", cookie)[0], 200)
         self.assertEqual(get("/assets/sky.webp", cookie)[0], 200)

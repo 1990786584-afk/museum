@@ -21,6 +21,13 @@ from urllib import request
 from urllib.parse import urlsplit
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+try:
+    # iPhone photos are frequently HEIC. Ephemera keeps the originals.
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
+
 MAX_IMAGE = 20 * 1024 * 1024
 
 class SyncError(Exception):
@@ -122,6 +129,18 @@ def sync_gallery(api: EphemeraClient, root: Path, source_shelf: Path,
     plans = api.json("/api/dates").get("plans")
     if not isinstance(plans, list):
         raise SyncError("expected plans array")
+    old = root / "current"
+    old = old.resolve() if old.is_symlink() else None
+
+    def reuse_private(source: Path, target: Path) -> bool:
+        if old is None or not source.is_file():
+            return False
+        try:
+            os.link(source, target)
+        except OSError:
+            shutil.copy2(source, target)
+        return True
+
     stage = Path(tempfile.mkdtemp(prefix=".gallery-", dir=root))
     try:
         (stage / "photos").mkdir()
@@ -140,6 +159,11 @@ def sync_gallery(api: EphemeraClient, root: Path, source_shelf: Path,
     goBox.href = "zfxf-box://open/" + s.boxId;
     goBox.textContent = "↗ 打开这一天的纪念盒";
     goBox.style.cssText = "display:block;margin-top:1.3em;color:inherit;text-decoration:underline;text-underline-offset:4px;font:inherit;";
+    // The original lightbox treats ordinary taps as "flip the paper".
+    // Let a real link be tapped without firing the card's pointer handler.
+    goBox.addEventListener("pointerdown", e => e.stopPropagation());
+    goBox.addEventListener("pointerup", e => e.stopPropagation());
+    goBox.addEventListener("click", e => e.stopPropagation());
     tx.append(document.createElement("br"), goBox);
   }
 '''
@@ -167,7 +191,11 @@ def sync_gallery(api: EphemeraClient, root: Path, source_shelf: Path,
                 title = "我们的约会"
             # A keepsake exists even if no photo was uploaded during the date.
             ticket_name = f"{date}_museum_box-{plan_id}.jpg"
-            _ticket_image(invitation, stage / "photos" / ticket_name)
+            if not reuse_private(
+                old / "photos" / ticket_name if old else Path("/nonexistent"),
+                stage / "photos" / ticket_name
+            ):
+                _ticket_image(invitation, stage / "photos" / ticket_name)
             (stage / "photos" / f"{date}_museum_box-{plan_id}.txt").write_text(
                 f"**{title}**\n{date}\n一封从 Ephemera 纪念盒寄来的信。\n标签：约会 · 纪念盒\n",
                 encoding="utf-8",
@@ -180,13 +208,16 @@ def sync_gallery(api: EphemeraClient, root: Path, source_shelf: Path,
             for photo in photos:
                 photo_id = valid_id(photo.get("id"))
                 # The authenticated her endpoint filters deleted and unshared photos.
-                raw = api.get(f"/api/dates/{plan_id}/her/photo/{photo_id}")
                 fname = f"{date}_museum_box-{plan_id}_photo-{photo_id}.jpg"
-                try:
-                    _make_jpeg(raw, stage / "photos" / fname)
-                except SyncError:
-                    ignored += 1
-                    continue
+                dest = stage / "photos" / fname
+                previous = old / "photos" / fname if old else Path("/nonexistent")
+                if not reuse_private(previous, dest):
+                    raw = api.get(f"/api/dates/{plan_id}/her/photo/{photo_id}")
+                    try:
+                        _make_jpeg(raw, dest)
+                    except SyncError:
+                        ignored += 1
+                        continue
                 caption = str(photo.get("caption") or "").strip()
                 note = f"**{title}**\n{date}\n"
                 if caption:
@@ -197,6 +228,20 @@ def sync_gallery(api: EphemeraClient, root: Path, source_shelf: Path,
                 )
                 linked[fname] = plan_id
                 count_photos += 1
+
+        # Reuse originals baked by the original Shelf recipe.
+        # A date+planID+photoID is immutable in Ephemera.
+        if old is not None:
+            baked_cache = old / "baked"
+            (stage / "baked").mkdir(exist_ok=True)
+            for photo in (stage / "photos").glob("*.jpg"):
+                if not (old / "photos" / photo.name).is_file():
+                    continue
+                base = photo.stem
+                variants = [baked_cache / f"{v}-{base}.webp" for v in ("t", "d", "b")]
+                if all(x.is_file() for x in variants):
+                    for var in variants:
+                        reuse_private(var, stage / "baked" / var.name)
 
         # Run the unchanged upstream image baker. The private snapshot is not
         # uploaded or written back to the public repository.

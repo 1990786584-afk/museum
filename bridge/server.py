@@ -113,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header(
                 "Set-Cookie",
                 f"museum_sid={cookie}; Path={self.server.state.cookie_path}; Secure; HttpOnly; "
-                "SameSite=Strict; Max-Age=3600",
+                "SameSite=Lax; Max-Age=3600",
             )
         self.headers_safe(len(content))
         self.end_headers()
