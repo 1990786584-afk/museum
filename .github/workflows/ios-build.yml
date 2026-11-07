@@ -1,0 +1,37 @@
+name: Build iPhone Museum app (simulator)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout native source
+        uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Check Xcode project structure
+        run: plutil -lint ios/Museum.xcodeproj/project.pbxproj
+      - name: Build for iOS Simulator without device signing
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/Museum.xcodeproj -scheme Museum -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/museum-build" \
+            CODE_SIGNING_ALLOWED=NO build | tee "$RUNNER_TEMP/xcodebuild.log" | tail -90
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZFxF-Museum-iOS-Simulator
+          path: ${{ runner.temp }}/museum-build/Build/Products/Debug-iphonesimulator/Museum.app
+          retention-days: 7
+          if-no-files-found: error
