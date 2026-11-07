@@ -116,6 +116,7 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
     }
 
     func disableAutomatic() {
+        pendingDiscoveries.removeAll()
         automaticDiscoveryEnabled = false
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
         for region in manager.monitoredRegions where region.identifier.hasPrefix(Self.prefix) {
@@ -123,35 +124,44 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
         }
     }
 
-    private struct SecretRegion: Decodable {
-        let id: String
+    // The original ZFxF server deliberately never returns exact coordinates
+    // for sealed letters. Its public map exposes only a deliberately blurred
+    // search area; we monitor that approximate circle and let the server
+    // decide whether a one-shot, opt-in location check actually reaches a letter.
+    private struct SearchArea: Decodable {
         let lat: Double
         let lon: Double
-        let radiusM: Double
+        let r: Double
+    }
+    private struct SecretRegion: Decodable {
+        let id: String
+        let status: String
+        let area: SearchArea
     }
     private struct Payload: Decodable {
-        let regions: [SecretRegion]
+        let letters: [SecretRegion]
     }
 
     private func fetchRegions(bearer: String) async throws -> [SecretRegion] {
-        var request = URLRequest(url: endpoint.appendingPathComponent("geofences"), timeoutInterval: 15)
+        var request = URLRequest(url: endpoint.appendingPathComponent("travel-map"), timeoutInterval: 15)
         request.setValue("Bearer " + bearer, forHTTPHeaderField: "Authorization")
         let (bytes, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200,
-              bytes.count < 300_000 else { throw URLError(.userAuthenticationRequired) }
-        return try JSONDecoder().decode(Payload.self, from: bytes).regions
+              bytes.count < 5_000_000 else { throw URLError(.userAuthenticationRequired) }
+        return try JSONDecoder().decode(Payload.self, from: bytes).letters
+            .filter { $0.status == "sealed" }
     }
 
     private func monitor(_ regions: [SecretRegion]) {
         guard automaticDiscoveryEnabled, manager.authorizationStatus == .authorizedAlways else { return }
         let here = currentFix
         let sorted = regions.filter {
-            $0.lat.isFinite && $0.lon.isFinite &&
-            abs($0.lat) <= 90 && abs($0.lon) <= 180
+            $0.area.lat.isFinite && $0.area.lon.isFinite && $0.area.r.isFinite &&
+            abs($0.area.lat) <= 90 && abs($0.area.lon) <= 180 && $0.area.r > 0
         }.sorted {
             guard let here else { return $0.id < $1.id }
-            let a = CLLocation(latitude: $0.lat, longitude: $0.lon)
-            let b = CLLocation(latitude: $1.lat, longitude: $1.lon)
+            let a = CLLocation(latitude: $0.area.lat, longitude: $0.area.lon)
+            let b = CLLocation(latitude: $1.area.lat, longitude: $1.area.lon)
             return here.distance(from: a) < here.distance(from: b)
         }
         // CoreLocation allows at most ~20 monitored regions per app.
@@ -164,8 +174,8 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
         for region in selection {
             let id = Self.prefix + region.id
             guard !manager.monitoredRegions.contains(where: { $0.identifier == id }) else { continue }
-            let center = CLLocationCoordinate2D(latitude: region.lat, longitude: region.lon)
-            let radius = min(max(160, region.radiusM), manager.maximumRegionMonitoringDistance)
+            let center = CLLocationCoordinate2D(latitude: region.area.lat, longitude: region.area.lon)
+            let radius = min(max(160, region.area.r), manager.maximumRegionMonitoringDistance)
             guard radius > 0 else { continue }
             let circle = CLCircularRegion(center: center, radius: radius, identifier: id)
             circle.notifyOnEntry = true
@@ -190,13 +200,20 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let last = locations.last, last.horizontalAccuracy >= 0 {
-            currentFix = last
-            // Do not store, upload, or log coordinates for map display.
+        guard let last = locations.last, last.horizontalAccuracy >= 0 else { return }
+        currentFix = last
+        // Manual map positioning never uploads coordinates. Only the separate
+        // opt-in geofence flow sends a single fix to the original ZFxF server.
+        if automaticDiscoveryEnabled && permission == .authorizedAlways &&
+           !pendingDiscoveries.isEmpty && last.horizontalAccuracy <= 250 {
+            let triggered = pendingDiscoveries
+            pendingDiscoveries.removeAll()
+            Task { await verifyNearbyLetters(at: last, triggered: triggered) }
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        pendingDiscoveries.removeAll()
         message = "当前定位暂不可用，可以稍后再试。"
     }
 
@@ -209,44 +226,63 @@ final class ZFxFLocationService: NSObject, ObservableObject, CLLocationManagerDe
         if state == .inside { discover(region: region) }
     }
 
-    private var discoveriesInFlight = Set<String>()
+    private var pendingDiscoveries = Set<String>()
 
     private func discover(region: CLRegion) {
         guard automaticDiscoveryEnabled, region.identifier.hasPrefix(Self.prefix),
               manager.authorizationStatus == .authorizedAlways,
-              let key = Self.loadPassword() else { return }
+              Self.loadPassword() != nil else { return }
         let id = String(region.identifier.dropFirst(Self.prefix.count))
-        guard !id.isEmpty, !discoveriesInFlight.contains(id) else { return }
-        discoveriesInFlight.insert(id)
-        Task {
-            defer { discoveriesInFlight.remove(id) }
-            do {
-                let url = endpoint.appendingPathComponent("geofences")
-                    .appendingPathComponent(id).appendingPathComponent("discover")
-                var request = URLRequest(url: url, timeoutInterval: 15)
-                request.httpMethod = "POST"
-                request.httpBody = Data()
-                request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
-                let (bytes, response) = try await URLSession.shared.data(for: request)
-                guard (response as? HTTPURLResponse)?.statusCode == 200,
-                      let payload = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
-                      payload["status"] as? String == "found" else { return }
-                let notifiedKey = "museum.zfxf.notified." + id
-                if !UserDefaults.standard.bool(forKey: notifiedKey) {
-                    let note = UNMutableNotificationContent()
-                    note.title = "ZFxF · 附近有封信"
-                    note.body = "一封提前藏好的信已经被发现。打开我们的秘密地图拆开它。"
-                    note.sound = .default
-                    try await UNUserNotificationCenter.current().add(
-                        UNNotificationRequest(identifier: "zfxf-" + id, content: note, trigger: nil)
-                    )
-                    UserDefaults.standard.set(true, forKey: notifiedKey)
-                }
-                await refreshRegions()
-            } catch {
-                // Offline geofence discoveries are not fabricated as success.
-                message = "系统发现了附近地点，但通知服务暂时不可用，之后可以再同步。"
+        guard !id.isEmpty, !pendingDiscoveries.contains(id) else { return }
+        pendingDiscoveries.insert(id)
+        // The public server deliberately hides the real letter coordinates.
+        // A region entry alone is NOT proof. Ask iOS for a fresh, single fix;
+        // the original /api/location endpoint validates the true distance.
+        manager.requestLocation()
+    }
+
+    private func verifyNearbyLetters(at fix: CLLocation, triggered: Set<String>) async {
+        guard automaticDiscoveryEnabled, manager.authorizationStatus == .authorizedAlways,
+              let key = Self.loadPassword(), !triggered.isEmpty else { return }
+        do {
+            let before = Set((try await fetchRegions(bearer: key)).map(\.id))
+            var request = URLRequest(url: endpoint.appendingPathComponent("location"), timeoutInterval: 15)
+            request.httpMethod = "POST"
+            request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "lat": fix.coordinate.latitude,
+                "lon": fix.coordinate.longitude,
+                "acc": fix.horizontalAccuracy
+            ])
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw URLError(.badServerResponse)
             }
+            // Server returns {ok:true}, not a per-letter discovery result.
+            // Check the public map AFTER the location is verified.
+            let after = try await fetchRegions(bearer: key)
+            let stillSealed = Set(after.map(\.id))
+            let justFound = triggered.intersection(before.subtracting(stillSealed))
+            for id in justFound {
+                let notifiedKey = "museum.zfxf.notified." + id
+                guard !UserDefaults.standard.bool(forKey: notifiedKey) else { continue }
+                let note = UNMutableNotificationContent()
+                note.title = "ZFxF · 附近有封信"
+                note.body = "一封提前藏好的信已经被发现。打开我们的秘密地图拆开它。"
+                note.sound = .default
+                try await UNUserNotificationCenter.current().add(
+                    UNNotificationRequest(identifier: "zfxf-" + id, content: note, trigger: nil)
+                )
+                UserDefaults.standard.set(true, forKey: notifiedKey)
+            }
+            pendingLetters = after.count
+            monitor(after)
+            message = justFound.isEmpty
+                ? "已与秘密地图核对附近位置，尚未发现新的信。"
+                : "发现了一封藏好的信，已经通知你。"
+        } catch {
+            message = "附近定位核验暂时失败，原有信件没有被修改。"
         }
     }
 
@@ -356,7 +392,7 @@ struct MuseumLocationView: View {
                         }
                     }
                     Section {
-                        Text("你的蓝点由 iOS MapKit 绘制。只有你主动开启自动发现后，系统才会监测封存信件附近的地点；不会持续上传 GPS 轨迹。秘密地点仍由原 ZFxF 服务保存，不会显示在这张地图上提前剧透。")
+                        Text("你的蓝点由 iOS MapKit 绘制。开启自动发现后，iOS 只监测原地图公开的模糊范围；进入范围时向原 ZFxF 服务发送一次当前位置，由服务端核验是否真的找到信。服务端可能保存这一次到访点，不会持续上传轨迹或提前显示信件的真实坐标。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
