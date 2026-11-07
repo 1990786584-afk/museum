@@ -9,15 +9,23 @@ struct MuseumHomeView: View {
     @StateObject private var browser = MuseumBrowserHolder()
     @State private var isInsideExhibit = false
     @State private var showConnection = false
+    @State private var galleryNotice = ""
 
     var body: some View {
         ZStack(alignment: .top) {
             Color(red: 0.91, green: 0.90, blue: 0.86).ignoresSafeArea()
             MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
+                          config: host.config,
                           onOpenLiveDates: {
                 guard host.config.isConfigured else { return false }
                 host.open(route: nil)
                 return true
+            }, onOpenBox: { id in
+                guard host.config.isConfigured else { return false }
+                host.open(route: ["page": "box", "planId": id])
+                return true
+            }, onGalleryError: { reason in
+                galleryNotice = reason
             })
             .ignoresSafeArea(edges: .bottom)
 
@@ -53,6 +61,19 @@ struct MuseumHomeView: View {
             .padding(.horizontal, 12)
             .padding(.top, 5)
         }
+        .alert("云端美术馆", isPresented: Binding(
+            get: { !galleryNotice.isEmpty },
+            set: { if !$0 { galleryNotice = "" } }
+        )) {
+            Button("知道了") { galleryNotice = "" }
+        } message: {
+            Text(galleryNotice)
+        }
+        .onChange(of: host.pageOpen) { _, isOpen in
+            // After closing the date box, the next gallery view should have
+            // the photos just added there. No second upload needed.
+            if !isOpen { browser.refreshPrivateGallery?() }
+        }
         .sheet(isPresented: $showConnection) {
             PrivateDatesSettings()
                 .environmentObject(host)
@@ -70,6 +91,7 @@ struct MuseumHomeView: View {
 final class MuseumBrowserHolder: ObservableObject {
     static let home = URL(string: "https://1990786584-afk.github.io/museum/")!
     weak var webView: WKWebView?
+    var refreshPrivateGallery: (() -> Void)?
 
     func goHome() {
         webView?.load(URLRequest(url: Self.home, cachePolicy: .useProtocolCachePolicy))
@@ -79,7 +101,10 @@ final class MuseumBrowserHolder: ObservableObject {
 private struct MuseumBrowser: UIViewRepresentable {
     let holder: MuseumBrowserHolder
     @Binding var insideExhibit: Bool
+    let config: HostConfig
     let onOpenLiveDates: () -> Bool
+    let onOpenBox: (Int) -> Bool
+    let onGalleryError: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
@@ -98,6 +123,11 @@ private struct MuseumBrowser: UIViewRepresentable {
         if #available(iOS 16.4, *) { view.isInspectable = true }
         #endif
         holder.webView = view
+        holder.refreshPrivateGallery = { [weak view, weak coordinator = context.coordinator] in
+            guard let view, let coordinator, let current = view.url,
+                  coordinator.isPrivateGallery(current) else { return }
+            coordinator.preparePrivateGallery(in: view)
+        }
         view.load(URLRequest(url: MuseumBrowserHolder.home))
         return view
     }
@@ -110,6 +140,14 @@ private struct MuseumBrowser: UIViewRepresentable {
         var parent: MuseumBrowser
         init(parent: MuseumBrowser) { self.parent = parent }
 
+        func isPrivateGallery(_ url: URL) -> Bool {
+            guard let target = parent.config.galleryURL,
+                  url.scheme == "https",
+                  url.host?.lowercased() == target.host?.lowercased(),
+                  url.port == target.port else { return false }
+            return url.path.hasPrefix(target.path)
+        }
+
         private func isMuseumPage(_ url: URL) -> Bool {
             url.scheme?.lowercased() == "https"
             && url.host?.lowercased() == MuseumBrowserHolder.home.host
@@ -118,7 +156,7 @@ private struct MuseumBrowser: UIViewRepresentable {
 
         private func updateLocation(_ webView: WKWebView) {
             guard let url = webView.url else { return }
-            let within = isMuseumPage(url) && url.path != "/museum/"
+            let within = (isMuseumPage(url) && url.path != "/museum/") || isPrivateGallery(url)
             DispatchQueue.main.async { self.parent.insideExhibit = within }
         }
 
@@ -129,12 +167,30 @@ private struct MuseumBrowser: UIViewRepresentable {
                 decisionHandler(.allow) // third-party image/font subresources, no native bridge here
                 return
             }
+            if url.scheme == "zfxf-box" {
+                decisionHandler(.cancel)
+                // Only a link from our authenticated gallery may navigate
+                // to a private box; never trust a public page's deep link.
+                if let source = webView.url, isPrivateGallery(source),
+                   url.host == "open",
+                   let id = Int(url.path.dropFirst()), id > 0 {
+                    _ = parent.onOpenBox(id)
+                }
+                return
+            }
             if isMuseumPage(url) {
                 if url.path == "/museum/dates/" && parent.onOpenLiveDates() {
                     decisionHandler(.cancel)
+                } else if url.path == "/museum/gallery/" && parent.config.isConfigured {
+                    decisionHandler(.cancel)
+                    preparePrivateGallery(in: webView)
                 } else {
                     decisionHandler(.allow)
                 }
+                return
+            }
+            if isPrivateGallery(url) {
+                decisionHandler(.allow)
                 return
             }
             if ["about", "blob", "data"].contains(url.scheme?.lowercased() ?? "") {
@@ -144,6 +200,58 @@ private struct MuseumBrowser: UIViewRepresentable {
             decisionHandler(.cancel)
             if url.scheme?.lowercased() == "https" {
                 UIApplication.shared.open(url)
+            }
+        }
+
+        /// The private server's JSON sync and cookie handshake are intentionally
+        /// separate. WKWebView never receives the her bearer token or its
+        /// Authorization header; it only receives a one-hour HttpOnly cookie.
+        func preparePrivateGallery(in webView: WKWebView) {
+            let cfg = parent.config
+            guard let sync = cfg.syncURL, let session = cfg.sessionURL,
+                  let gallery = cfg.galleryURL else { return }
+            Task { @MainActor [weak webView] in
+                guard let webView else { return }
+                do {
+                    var syncReq = URLRequest(url: sync, timeoutInterval: 120)
+                    syncReq.httpMethod = "POST"
+                    syncReq.httpBody = Data()
+                    syncReq.setValue("Bearer " + cfg.credential, forHTTPHeaderField: "Authorization")
+                    let (_, syncRes) = try await URLSession.shared.data(for: syncReq)
+                    guard (syncRes as? HTTPURLResponse)?.statusCode == 200 else {
+                        throw URLError(.badServerResponse)
+                    }
+
+                    var sessionReq = URLRequest(url: session, timeoutInterval: 20)
+                    sessionReq.httpMethod = "POST"
+                    sessionReq.httpBody = Data()
+                    sessionReq.setValue("Bearer " + cfg.credential, forHTTPHeaderField: "Authorization")
+                    let (_, sessionRes) = try await URLSession.shared.data(for: sessionReq)
+                    guard let http = sessionRes as? HTTPURLResponse, http.statusCode == 204 else {
+                        throw URLError(.userAuthenticationRequired)
+                    }
+                    let fields = http.allHeaderFields.reduce(into: [String: String]()) { dict, pair in
+                        if let key = pair.key as? String, let value = pair.value as? String {
+                            dict[key] = value
+                        }
+                    }
+                    let cookies = HTTPCookie.cookies(withResponseHeaderFields: fields, for: session)
+                    guard let cookie = cookies.first(where: { $0.name == "museum_sid" }) else {
+                        throw URLError(.badServerResponse)
+                    }
+                    await withCheckedContinuation { (resume: CheckedContinuation<Void, Never>) in
+                        webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie) {
+                            resume.resume()
+                        }
+                    }
+                    webView.load(URLRequest(url: gallery, cachePolicy: .reloadIgnoringLocalCacheData))
+                } catch {
+                    parent.onGalleryError(
+                        "私人照片尚未连接成功，先展示原作样本。请检查服务地址及网络；原有照片和约会数据没有被修改。"
+                    )
+                    webView.load(URLRequest(url: URL(string:
+                        "https://1990786584-afk.github.io/museum/gallery/")!))
+                }
             }
         }
 
@@ -167,6 +275,12 @@ private struct MuseumBrowser: UIViewRepresentable {
                      windowFeatures: WKWindowFeatures) -> WKWebView? {
             if let url = action.request.url {
                 if isMuseumPage(url) {
+                    if url.path == "/museum/gallery/" && parent.config.isConfigured {
+                        preparePrivateGallery(in: webView)
+                    } else {
+                        webView.load(URLRequest(url: url))
+                    }
+                } else if isPrivateGallery(url) {
                     webView.load(URLRequest(url: url))
                 } else if url.scheme?.lowercased() == "https" {
                     UIApplication.shared.open(url)
@@ -189,12 +303,12 @@ private struct PrivateDatesSettings: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("云端相册与约会纸品目前保留原作者的界面。私人约会服务是可选的，未配置时会打开 Ephemera 原作的互动演示。")
+                    Text("私人 Ephemera 后端和云端相册同步服务共用一个 HTTPS 地址。配置后，在 Ephemera 存照片，结束的约会会在下次打开云端相册时自动出现；未配置时仍是原作演示数据。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Section("私人 Ephemera 服务") {
-                    TextField("https://你的私人服务器域名", text: $origin)
+                    TextField("https://你的域名/date", text: $origin)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
@@ -205,7 +319,7 @@ private struct PrivateDatesSettings: View {
                         .accessibilityIdentifier("her-token")
                     Button("保存连接") {
                         if host.saveConnection(origin: origin, credential: token) {
-                            status = "已保存到本机。再次点击约会纸品，将打开私人纪念盒。"
+                            status = "已保存。约会纪念盒与私人云端相册将使用同一份约会数据。"
                         } else {
                             status = "需要 HTTPS 服务地址和有效口令，检查后再保存。"
                         }

@@ -15,10 +15,17 @@ struct HostConfig {
         guard let c = URLComponents(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               c.scheme?.lowercased() == "https",
               let host = c.host, !host.isEmpty,
-              c.user == nil, c.password == nil, c.query == nil, c.fragment == nil,
-              c.path.isEmpty || c.path == "/" else { return nil }
+              c.user == nil, c.password == nil, c.query == nil, c.fragment == nil else { return nil }
+        // A private server may live under a dedicated reverse-proxy prefix
+        // such as https://example.org/date. Reject encoded paths and traversal.
+        let path = c.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !path.isEmpty && path.range(
+            of: "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$",
+            options: .regularExpression
+        ) == nil { return nil }
         var value = "https://\(host.lowercased())"
         if let port = c.port { value += ":\(port)" }
+        if !path.isEmpty { value += "/" + path }
         return value
     }
 
@@ -32,6 +39,19 @@ struct HostConfig {
     // Native bridge enabled from the first load. The credential is NEVER in the URL.
     var pageURL: String { apiBase + "/app/?embed=native" }
     var resolvedAPIBase: String { apiBase }
+    var galleryURL: URL? {
+        guard isConfigured else { return nil }
+        return URL(string: apiBase + "/museum-gallery/")
+    }
+    var sessionURL: URL? {
+        guard isConfigured else { return nil }
+        return URL(string: apiBase + "/museum-gallery/session")
+    }
+    var syncURL: URL? {
+        guard isConfigured else { return nil }
+        return URL(string: apiBase + "/museum-gallery/sync")
+    }
+
 }
 
 enum MuseumKeychain {

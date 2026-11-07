@@ -70,3 +70,16 @@ python3 -m http.server 8000 --directory preview
 - .github/workflows/preview.yml — GitHub Pages 自动构建与部署。
 
 > ZFxF makes moments. Our museum keeps them.
+
+## 🔗 两间展厅的数据互通
+
+已加入独立的私有同步服务：`bridge/`，可将 Ephemera 已结束的约会
+及有效上传照片同步至**私有版** Shelf in the Sky。照片由原作者的
+烤相纸程序处理，翻面可以点击回到同一天的 Ephemera 纪念盒。
+
+- 互通代码与端到端自动测试见 [bridge/README.md](bridge/README.md)。
+- iOS 配置私人 HTTPS 服务后，打开云端美术馆可进行同步。
+- 公开 GitHub Pages 仍只展示官方的**示例照片和演示约会**，
+  无需把私人回忆上传到 GitHub。
+- 在没有配置、部署或通过安全检查之前，iOS 会明确提示同步不可用，
+  自动回到公开示例，不假装已经互通。

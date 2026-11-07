@@ -320,7 +320,9 @@ extension EphemeraViewController: WKNavigationDelegate, WKUIDelegate {
         let scheme = url.scheme?.lowercased() ?? ""
         // The private credential is present only on this trusted date-service page.
         // Do not let a same-origin but unrelated document inherit the native bridge.
-        let appPage = sameOrigin(url) && (url.path == "/app" || url.path.hasPrefix("/app/"))
+        let allowedRoot = URL(string: config.pageURL)?.path ?? "/app/"
+        let appPage = sameOrigin(url)
+            && (url.path == String(allowedRoot.dropLast()) || url.path.hasPrefix(allowedRoot))
         if appPage || ["about", "blob", "data"].contains(scheme) || action.targetFrame?.isMainFrame == false {
             decisionHandler(.allow)
             return
