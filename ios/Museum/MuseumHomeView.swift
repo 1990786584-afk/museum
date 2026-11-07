@@ -31,42 +31,64 @@ struct MuseumHomeView: View {
     var body: some View {
         ZStack {
             if let exhibit {
-                // A native view presents the original art as an embedded scene.
-                // No Safari URL bar, address field, or web-based launcher.
-                MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
-                              config: host.config, startURL: exhibit.url,
-                              onOpenLiveDates: {
-                    guard host.config.isConfigured else { return false }
-                    host.open(route: nil)
-                    return true
-                }, onOpenBox: { id in
-                    guard host.config.isConfigured else { return false }
-                    host.open(route: ["page": "box", "planId": id])
-                    return true
-                }, onGalleryError: { reason in
-                    galleryNotice = reason
-                })
-                .ignoresSafeArea()
-
-                VStack {
-                    HStack {
+                // A real native header occupies its own vertical space; the
+                // web renderer never starts underneath our back button.
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
                         Button {
                             self.exhibit = nil
                         } label: {
                             Label("纪念馆", systemImage: "chevron.left")
                                 .font(.system(size: 15, weight: .medium))
                                 .padding(.horizontal, 13)
-                                .padding(.vertical, 11)
+                                .frame(height: 40)
                                 .background(.regularMaterial, in: Capsule())
                         }
                         .accessibilityIdentifier("museum-native-back")
                         .buttonStyle(.plain)
-                        Spacer()
+
+                        Spacer(minLength: 8)
+
+                        if exhibit == .datesDemo {
+                            // Keep Ephemera's demo fast-forward working, but
+                            // place its control in our dedicated native bar.
+                            Button {
+                                browser.advanceDemo()
+                            } label: {
+                                Label("试玩 · 快进", systemImage: "forward.fill")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 36)
+                                    .background(.regularMaterial, in: Capsule())
+                            }
+                            .accessibilityLabel("试玩：推进到下一个约会阶段")
+                            .accessibilityIdentifier("museum-demo-next")
+                            .buttonStyle(.plain)
+                        }
                     }
-                    Spacer()
+                    .foregroundStyle(Color(red: 0.30, green: 0.28, blue: 0.23))
+                    .padding(.horizontal, 16)
+                    .frame(height: 56)
+                    .background(Color(red: 0.985, green: 0.965, blue: 0.937))
+
+                    MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
+                                  config: host.config, startURL: exhibit.url,
+                                  onOpenLiveDates: {
+                        guard host.config.isConfigured else { return false }
+                        host.open(route: nil)
+                        return true
+                    }, onOpenBox: { id in
+                        guard host.config.isConfigured else { return false }
+                        host.open(route: ["page": "box", "planId": id])
+                        return true
+                    }, onGalleryError: { reason in
+                        galleryNotice = reason
+                    })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
+                // The exhibit's own tab bar must reach the home-indicator
+                // edge, not stop above a white system-safe-area strip.
+                .ignoresSafeArea(edges: .bottom)
             } else {
                 NativeMuseumEntrance(
                     openSky: { exhibit = .sky },
@@ -80,6 +102,23 @@ struct MuseumHomeView: View {
                     openLocation: { showLocation = true },
                     openSettings: { showConnection = true }
                 )
+            }
+        }
+        .background {
+            // The painted sky fills the entire screen, including the bottom
+            // home-indicator inset. The Ephemera demo uses its paper colour.
+            if exhibit == .datesDemo {
+                Color(red: 0.985, green: 0.965, blue: 0.937)
+                    .ignoresSafeArea()
+            } else {
+                GeometryReader { size in
+                    Image("MuseumSky")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size.size.width, height: size.size.height)
+                        .clipped()
+                }
+                .ignoresSafeArea()
             }
         }
         .alert("纪念馆", isPresented: Binding(
@@ -129,16 +168,7 @@ private struct NativeMuseumEntrance: View {
     let openSettings: () -> Void
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Image("MuseumSky")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .ignoresSafeArea()
-
-                ScrollView {
+        ScrollView {
                     VStack(spacing: 23) {
                         HStack {
                             Button(action: openLocation) {
@@ -212,9 +242,8 @@ private struct NativeMuseumEntrance: View {
                     .padding(.top, 14)
                     .padding(.bottom, 35)
                     .frame(maxWidth: .infinity)
-                }
-            }
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 }
 
@@ -243,13 +272,15 @@ private struct ExhibitCard: View {
                     .font(.custom("Georgia-Italic", size: 24))
                     .lineLimit(2)
                     .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Reserve exactly two title lines on both cards, even
+                    // when Ephemera needs only one. Captions then align.
+                    .frame(maxWidth: .infinity, minHeight: 66, alignment: .topLeading)
 
                 Text(caption)
                     .font(.system(size: 13, design: .serif))
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
             }
             .padding(8)
             .background(Color(red: 0.99, green: 0.97, blue: 0.91).opacity(0.63))
@@ -273,6 +304,21 @@ final class MuseumBrowserHolder: ObservableObject {
     func goHome() {
         webView?.load(URLRequest(url: Self.home, cachePolicy: .useProtocolCachePolicy))
     }
+
+    /// Ephemera's upstream demo still owns all state and advance logic.
+    /// The iOS button simply invokes its existing testID press handler.
+    func advanceDemo() {
+        guard let webView,
+              webView.url?.path.hasPrefix("/museum/dates/") == true else { return }
+        webView.evaluateJavaScript("""
+          (() => {
+            const button = document.querySelector('[data-testid="demo-step"]');
+            if (!button) return false;
+            button.click();
+            return true;
+          })()
+          """) { _, _ in }
+    }
 }
 
 private struct MuseumBrowser: UIViewRepresentable {
@@ -289,6 +335,19 @@ private struct MuseumBrowser: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        if startURL.path == "/museum/dates/" {
+            // The demo's own floating pill overlaps page headings on iPhone.
+            // Hide only that test control, without changing the upstream
+            // design or its JS fast-forward handler (see advanceDemo()).
+            let script = WKUserScript(source: """
+                (() => {
+                  const style = document.createElement('style');
+                  style.textContent = '[data-testid="demo-step"] { visibility: hidden !important; }';
+                  (document.head || document.documentElement).appendChild(style);
+                })();
+                """, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            configuration.userContentController.addUserScript(script)
+        }
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.isOpaque = false
         view.backgroundColor = UIColor(red: 0.91, green: 0.90, blue: 0.86, alpha: 1)
