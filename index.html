@@ -22,10 +22,15 @@
     a.exhibit:focus-visible{outline:3px solid #846d57;outline-offset:2px}
     @media(hover:hover){a.exhibit:hover{transform:translateY(-3px)}}
     .exhibit img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border:1px solid rgba(102,80,54,.25)}
+    /* Crop only the existing Ephemera screenshot to the physical envelope.
+       No new illustration and no changes to either upstream app's styling. */
+    .envelope-frame{position:relative;display:block;width:100%;aspect-ratio:4/5;overflow:hidden;background:#cbbd9f;border:1px solid rgba(102,80,54,.25)}
+    .envelope-frame img{position:absolute;left:-7.5%;top:-19%;width:115%;height:auto;max-width:none;aspect-ratio:auto;object-fit:initial;border:0;filter:sepia(.94) saturate(.54) brightness(.91) contrast(.93)}
+    .envelope-frame::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,rgba(240,220,175,.06),rgba(94,69,37,.20));mix-blend-mode:multiply}
     .name{display:block;font:italic clamp(21px,4vw,30px) "IM Fell",Georgia,serif;padding:12px 4px 3px}
     .cn{display:block;font-size:12px;letter-spacing:.06em;padding:0 4px 9px}
     footer{font:italic 15px "IM Fell",Georgia,serif;letter-spacing:.06em;margin-top:25px}
-    @media(max-width:540px){.veil{align-items:flex-start;padding:20px 12px}.caption{margin-bottom:18px}main{padding:20px 15px}nav{gap:11px}.exhibit img{aspect-ratio:3/4}.name{min-height:67px}}
+    @media(max-width:540px){.veil{align-items:flex-start;padding:20px 12px}.caption{margin-bottom:18px}main{padding:20px 15px}nav{gap:11px}.exhibit img{aspect-ratio:3/4}.envelope-frame{aspect-ratio:3/4}.envelope-frame img{aspect-ratio:auto}.name{min-height:67px}}
     @media(prefers-reduced-motion:reduce){a.exhibit{transition:none}}
   </style>
 </head>
@@ -42,7 +47,7 @@
           <span class="cn">云里的照片 · 拿起、翻面、漫游</span>
         </a>
         <a class="exhibit" href="./dates/" aria-label="走进约会纪念盒，采用 Ephemera 原作交互">
-          <img src="./museum-assets/ephemera-envelope.jpg" alt="Ephemera 原作的火漆信封与请柬" loading="eager">
+          <span class="envelope-frame"><img src="./museum-assets/ephemera-envelope.jpg" alt="复古色调的 Ephemera 火漆信封" loading="eager"></span>
           <span class="name">Ephemera</span>
           <span class="cn">约会的纸品 · 信封、票根、纪念盒</span>
         </a>
