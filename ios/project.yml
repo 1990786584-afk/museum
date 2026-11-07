@@ -1,0 +1,34 @@
+# Optional XcodeGen specification; a ready-to-open Museum.xcodeproj is checked in.
+name: Museum
+options:
+  bundleIdPrefix: com.zfxf
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Museum:
+    type: application
+    platform: iOS
+    sources:
+      - path: Museum
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zfxf.museum
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Museum/Info.plist
+    info:
+      path: Museum/Info.plist
+      properties:
+        CFBundleDisplayName: ZFxF Museum
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Light
