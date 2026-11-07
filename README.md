@@ -5,14 +5,14 @@
 这是念念新建的 museum 仓库。**以原作为准**，不改动 Shelf in the Sky 和
 Ephemera 的字体、排版、相纸、天空、火漆、纸品和内部交互。
 
-## 📱 iPhone 应用（已提交并通过 Xcode 模拟器构建）
+## 📱 iPhone 原生应用（SwiftUI 首页 + 原版展厅）
 
 - 原生工程：[`ios/Museum.xcodeproj`](ios/Museum.xcodeproj)（SwiftUI + WKWebView，iOS 17+）。
 - [安装、签名和当前功能说明](ios/README.md)。
-- iOS 宿主直接显示已经部署的网页两间展厅；原画、相纸、火漆信封、排版和内部动画**完全沿用两个上游项目**。
+- iOS App 使用 SwiftUI 原生首页和打包的原版天空、纸纹、肖像、信封素材；两个展厅的原版内部交互仍通过 WKWebView 渲染，点击展厅不会跳转系统 Safari。展厅目前仍联网加载，尚非完全离线版本。
 - 约会服务如果接入私人 HTTPS 后端，可通过 Ephemera 原生桥使用原图选择、纪念盒和通知；口令仅在设备钥匙串里，默认只有演示数据。
 - CI 已验证项目可在 iOS 模拟器环境正常编译。真实 iPhone 需用自己的 Apple Developer Team 在 Xcode 签名安装。
-- 私人回忆与跨展厅同步仍待接入，ZFxF 地图软件保持单独存在。
+- 私有约会和相册已有独立的同步桥，真机需填写私人服务器地址和口令并实际验收；原 ZFxF 藏信地图保持独立。iOS 另有需主动同意的 CoreLocation 地理围栏：只利用原地图公开的模糊范围，进入范围后单次定位由原服务器判定是否真正到达，具体信息见 ios/README.md。
 
 ## 已经完成
 
