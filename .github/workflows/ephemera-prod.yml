@@ -1,0 +1,40 @@
+name: Build Ephemera private iOS web pages
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ephemera-prod.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sources/ephemera-date/web/package-lock.json
+      - name: Install upstream dependencies
+        working-directory: sources/ephemera-date/web
+        run: npm ci --no-audit --no-fund
+      - name: Build upstream production view without changing its UI
+        working-directory: sources/ephemera-date/web
+        env:
+          EPHEMERA_WEB_BASE: /date/app
+          EXPO_NO_TELEMETRY: '1'
+        run: npm run build
+      - name: Upload trusted production site
+        uses: actions/upload-artifact@v4
+        with:
+          name: museum-ephemera-production-web
+          path: sources/ephemera-date/web/dist/
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
