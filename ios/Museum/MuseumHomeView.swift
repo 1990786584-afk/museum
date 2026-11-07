@@ -2,66 +2,87 @@ import SafariServices
 import SwiftUI
 import WebKit
 
-/// The original website draws the museum and the two exhibits.
-/// SwiftUI only owns native navigation and the optional private date connection.
+/// Native SwiftUI museum entrance. The two *exhibitions* use their
+/// original web renderers inside WKWebView, never in external Safari.
+/// This is an iPhone app, not a PWA shortcut or a website home screen.
+private enum MuseumExhibit: Equatable {
+    case sky
+    case datesDemo
+
+    var url: URL {
+        switch self {
+        case .sky:
+            return URL(string: "https://1990786584-afk.github.io/museum/gallery/")!
+        case .datesDemo:
+            return URL(string: "https://1990786584-afk.github.io/museum/dates/")!
+        }
+    }
+}
+
 struct MuseumHomeView: View {
     @EnvironmentObject private var host: HostState
     @StateObject private var browser = MuseumBrowserHolder()
-    @State private var isInsideExhibit = false
+    @State private var exhibit: MuseumExhibit?
     @State private var showConnection = false
+    @State private var showLocation = false
     @State private var galleryNotice = ""
+    @State private var isInsideExhibit = false
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(red: 0.91, green: 0.90, blue: 0.86).ignoresSafeArea()
-            MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
-                          config: host.config,
-                          onOpenLiveDates: {
-                guard host.config.isConfigured else { return false }
-                host.open(route: nil)
-                return true
-            }, onOpenBox: { id in
-                guard host.config.isConfigured else { return false }
-                host.open(route: ["page": "box", "planId": id])
-                return true
-            }, onGalleryError: { reason in
-                galleryNotice = reason
-            })
-            .ignoresSafeArea(edges: .bottom)
+        ZStack {
+            if let exhibit {
+                // A native view presents the original art as an embedded scene.
+                // No Safari URL bar, address field, or web-based launcher.
+                MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
+                              config: host.config, startURL: exhibit.url,
+                              onOpenLiveDates: {
+                    guard host.config.isConfigured else { return false }
+                    host.open(route: nil)
+                    return true
+                }, onOpenBox: { id in
+                    guard host.config.isConfigured else { return false }
+                    host.open(route: ["page": "box", "planId": id])
+                    return true
+                }, onGalleryError: { reason in
+                    galleryNotice = reason
+                })
+                .ignoresSafeArea()
 
-            // Host-only controls. We do not inject CSS, nav bars or custom drawing
-            // into the original Shelf in the Sky or Ephemera pages.
-            HStack {
-                if isInsideExhibit {
-                    Button {
-                        browser.goHome()
-                    } label: {
-                        Image(systemName: "house")
-                            .font(.system(size: 16, weight: .medium))
-                            .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial, in: Circle())
+                VStack {
+                    HStack {
+                        Button {
+                            self.exhibit = nil
+                        } label: {
+                            Label("纪念馆", systemImage: "chevron.left")
+                                .font(.system(size: 15, weight: .medium))
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 11)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                        .accessibilityIdentifier("museum-native-back")
+                        .buttonStyle(.plain)
+                        Spacer()
                     }
-                    .accessibilityLabel("返回纪念馆")
+                    Spacer()
                 }
-                Spacer()
-                if !isInsideExhibit {
-                    Button {
-                        showConnection = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .medium))
-                            .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .accessibilityLabel("私人约会服务设置")
-                }
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+            } else {
+                NativeMuseumEntrance(
+                    openSky: { exhibit = .sky },
+                    openDates: {
+                        if host.config.isConfigured {
+                            host.open(route: nil)
+                        } else {
+                            exhibit = .datesDemo
+                        }
+                    },
+                    openLocation: { showLocation = true },
+                    openSettings: { showConnection = true }
+                )
             }
-            .foregroundStyle(.primary)
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.top, 5)
         }
-        .alert("云端美术馆", isPresented: Binding(
+        .alert("纪念馆", isPresented: Binding(
             get: { !galleryNotice.isEmpty },
             set: { if !$0 { galleryNotice = "" } }
         )) {
@@ -70,14 +91,11 @@ struct MuseumHomeView: View {
             Text(galleryNotice)
         }
         .onChange(of: host.pageOpen) { _, isOpen in
-            // After closing the date box, the next gallery view should have
-            // the photos just added there. No second upload needed.
             if !isOpen { browser.refreshPrivateGallery?() }
         }
         .onChange(of: host.config.isConfigured) { _, connected in
-            // Disconnecting must also remove the one-hour WebKit gallery cookie.
             guard !connected else { return }
-            browser.goHome()
+            exhibit = nil
             browser.webView?.configuration.websiteDataStore.httpCookieStore
                 .getAllCookies { cookies in
                     guard let webView = browser.webView else { return }
@@ -88,14 +106,160 @@ struct MuseumHomeView: View {
                 }
         }
         .sheet(isPresented: $showConnection) {
-            PrivateDatesSettings()
-                .environmentObject(host)
+            PrivateDatesSettings().environmentObject(host)
+        }
+        .sheet(isPresented: $showLocation) {
+            MuseumLocationView()
         }
         .fullScreenCover(isPresented: $host.pageOpen) {
-            // Original upstream native embed: HTML, animations and paper UI are untouched.
+            // Original Ephemera invitation, wax seal, and ticket renderer.
             EphemeraPage(config: host.config, route: host.pendingRoute)
                 .ignoresSafeArea()
         }
+    }
+}
+
+/// The original Shelf & Ephemera images and paper texture are native app
+/// resources. Their fonts, layout and animations inside the exhibitions are
+/// never overwritten. No web address is opened by the home buttons.
+private struct NativeMuseumEntrance: View {
+    let openSky: () -> Void
+    let openDates: () -> Void
+    let openLocation: () -> Void
+    let openSettings: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Image("MuseumSky")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 23) {
+                        HStack {
+                            Button(action: openLocation) {
+                                Label("附近的信", systemImage: "location")
+                                    .font(.system(size: 13))
+                            }
+                            .accessibilityIdentifier("native-location")
+                            Spacer()
+                            Button(action: openSettings) {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 18))
+                                    .frame(width: 35, height: 34)
+                            }
+                            .accessibilityLabel("私人纪念馆设置")
+                        }
+                        .buttonStyle(.plain)
+
+                        VStack(spacing: 7) {
+                            Text("ZFxF · since December 14, 2024")
+                                .font(.custom("Georgia-Italic", size: 14))
+                                .tracking(1)
+                                .minimumScaleFactor(0.72)
+                                .lineLimit(1)
+                            Text("The Museum of Us")
+                                .font(.custom("Georgia-Italic", size: 36))
+                                .minimumScaleFactor(0.68)
+                                .lineLimit(1)
+                                .padding(.vertical, 6)
+                            Text("我们的私人纪念馆")
+                                .font(.system(size: 14, design: .serif))
+                                .tracking(4)
+                        }
+                        .padding(.bottom, 5)
+
+                        HStack(alignment: .top, spacing: 12) {
+                            ExhibitCard(
+                                image: "MuseumPortrait",
+                                title: "Shelf in the Sky",
+                                caption: "云里的照片 · 拿起、翻面、漫游",
+                                action: openSky
+                            )
+                            ExhibitCard(
+                                image: "MuseumEnvelope",
+                                title: "Ephemera",
+                                caption: "约会的纸品 · 信封、票根、纪念盒",
+                                action: openDates
+                            )
+                        }
+
+                        Text("Zoey & Finnian · our little museum")
+                            .font(.custom("Georgia-Italic", size: 16))
+                            .minimumScaleFactor(0.75)
+                            .lineLimit(1)
+                            .padding(.top, 8)
+                    }
+                    .foregroundStyle(Color(red: 0.30, green: 0.28, blue: 0.23))
+                    .padding(.horizontal, 19)
+                    .padding(.top, 17)
+                    .padding(.bottom, 30)
+                    .frame(maxWidth: 720)
+                    .background {
+                        Image("MuseumPaper")
+                            .resizable(resizingMode: .tile)
+                            .overlay {
+                                Rectangle()
+                                    .strokeBorder(Color(red: 0.67, green: 0.60, blue: 0.48),
+                                                  lineWidth: 0.8)
+                            }
+                    }
+                    .padding(.horizontal, 15)
+                    .padding(.top, 14)
+                    .padding(.bottom, 35)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+private struct ExhibitCard: View {
+    let image: String
+    let title: String
+    let caption: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 13) {
+                GeometryReader { geo in
+                    Image(image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .overlay {
+                            Rectangle().strokeBorder(.black.opacity(0.12), lineWidth: 0.6)
+                        }
+                }
+                .aspectRatio(0.81, contentMode: .fit)
+
+                Text(title)
+                    .font(.custom("Georgia-Italic", size: 24))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(caption)
+                    .font(.system(size: 13, design: .serif))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+            }
+            .padding(8)
+            .background(Color(red: 0.99, green: 0.97, blue: 0.91).opacity(0.63))
+            .overlay {
+                Rectangle().strokeBorder(Color(red: 0.68, green: 0.62, blue: 0.54), lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title + "，" + caption)
+        .accessibilityIdentifier(image == "MuseumPortrait" ? "native-sky" : "native-dates")
     }
 }
 
@@ -115,6 +279,7 @@ private struct MuseumBrowser: UIViewRepresentable {
     let holder: MuseumBrowserHolder
     @Binding var insideExhibit: Bool
     let config: HostConfig
+    let startURL: URL
     let onOpenLiveDates: () -> Bool
     let onOpenBox: (Int) -> Bool
     let onGalleryError: (String) -> Void
@@ -141,7 +306,11 @@ private struct MuseumBrowser: UIViewRepresentable {
                   coordinator.isPrivateGallery(current) else { return }
             coordinator.preparePrivateGallery(in: view)
         }
-        view.load(URLRequest(url: MuseumBrowserHolder.home))
+        if startURL.path == "/museum/gallery/" && config.isConfigured {
+            context.coordinator.preparePrivateGallery(in: view)
+        } else {
+            view.load(URLRequest(url: startURL))
+        }
         return view
     }
 
@@ -164,7 +333,7 @@ private struct MuseumBrowser: UIViewRepresentable {
         private func isMuseumPage(_ url: URL) -> Bool {
             url.scheme?.lowercased() == "https"
             && url.host?.lowercased() == MuseumBrowserHolder.home.host
-            && url.path.hasPrefix("/museum/")
+            && (url.path == "/museum" || url.path.hasPrefix("/museum/"))
         }
 
         private func updateLocation(_ webView: WKWebView) {
@@ -211,9 +380,8 @@ private struct MuseumBrowser: UIViewRepresentable {
                 return
             }
             decisionHandler(.cancel)
-            if url.scheme?.lowercased() == "https" {
-                UIApplication.shared.open(url)
-            }
+            // External links are never opened automatically in Safari.
+            // The museum stays inside its native iOS window.
         }
 
         /// The private server's JSON sync and cookie handshake are intentionally
@@ -309,8 +477,8 @@ private struct MuseumBrowser: UIViewRepresentable {
                     }
                 } else if isPrivateGallery(url) {
                     webView.load(URLRequest(url: url))
-                } else if url.scheme?.lowercased() == "https" {
-                    UIApplication.shared.open(url)
+                } else {
+                    // Do not launch an external Safari window from the app.
                 }
             }
             return nil

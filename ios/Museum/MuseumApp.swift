@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Restore opt-in iOS region-monitoring callbacks after system relaunch.
+        _ = ZFxFLocationService.shared
         return true
     }
 

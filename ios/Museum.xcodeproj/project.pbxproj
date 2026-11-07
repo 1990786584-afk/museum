@@ -14,6 +14,7 @@
 		CA9A5FB534E23C8AE0AB9A24 /* EphemeraPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2507359971558D84663F17 /* EphemeraPage.swift */; };
 		F51361A16779E979598E26A1 /* EphemeraViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC5FC4961E93536A68AD3C1 /* EphemeraViewController.swift */; };
 		D12411A77C99810000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D12411A77C99810000000002 /* Assets.xcassets */; };
+		D12411A77C99810000000004 /* MuseumLocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12411A77C99810000000005 /* MuseumLocationView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		CA32435421500C49C79B0E1C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		EEFC26F8EB26A53F3F2577FC /* Museum.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Museum.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D12411A77C99810000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D12411A77C99810000000005 /* MuseumLocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuseumLocationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -36,6 +38,7 @@
 				0B2507359971558D84663F17 /* EphemeraPage.swift */,
 				4CC5FC4961E93536A68AD3C1 /* EphemeraViewController.swift */,
 				8C3FF91AE903492939CD877B /* MuseumHomeView.swift */,
+                D12411A77C99810000000005 /* MuseumLocationView.swift */,
 				6F25F87E3E26E08998D3CA72 /* HostState.swift */,
 				CA32435421500C49C79B0E1C /* Info.plist */,
 				0D9299236BDC22BF8C43BB00 /* PhotoFile.swift */,
@@ -136,6 +139,7 @@
 				CA9A5FB534E23C8AE0AB9A24 /* EphemeraPage.swift in Sources */,
 				F51361A16779E979598E26A1 /* EphemeraViewController.swift in Sources */,
 				9C8CCA5D1684E34D326E2FF7 /* MuseumHomeView.swift in Sources */,
+                D12411A77C99810000000004 /* MuseumLocationView.swift in Sources */,
 				140BE54018833C5B7AE64CFA /* HostState.swift in Sources */,
 				1B8B2C3558ECFDD974DBBFBF /* PhotoFile.swift in Sources */,
 			);
