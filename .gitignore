@@ -1,0 +1,8 @@
+dist/
+preview/
+private/
+*.env
+.env*
+!.env.example
+.DS_Store
+__pycache__/

@@ -1,0 +1,6 @@
+[submodule "sources/shelf-in-the-sky"]
+	path = sources/shelf-in-the-sky
+	url = https://github.com/yolilin642-byte/shelf-in-the-sky.git
+[submodule "sources/ephemera-date"]
+	path = sources/ephemera-date
+	url = https://github.com/tsuru0805/ephemera-date.git
