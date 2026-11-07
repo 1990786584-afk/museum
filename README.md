@@ -5,6 +5,15 @@
 这是念念新建的 museum 仓库。**以原作为准**，不改动 Shelf in the Sky 和
 Ephemera 的字体、排版、相纸、天空、火漆、纸品和内部交互。
 
+## 📱 iPhone 应用（已提交并通过 Xcode 模拟器构建）
+
+- 原生工程：[`ios/Museum.xcodeproj`](ios/Museum.xcodeproj)（SwiftUI + WKWebView，iOS 17+）。
+- [安装、签名和当前功能说明](ios/README.md)。
+- iOS 宿主直接显示已经部署的网页两间展厅；原画、相纸、火漆信封、排版和内部动画**完全沿用两个上游项目**。
+- 约会服务如果接入私人 HTTPS 后端，可通过 Ephemera 原生桥使用原图选择、纪念盒和通知；口令仅在设备钥匙串里，默认只有演示数据。
+- CI 已验证项目可在 iOS 模拟器环境正常编译。真实 iPhone 需用自己的 Apple Developer Team 在 Xcode 签名安装。
+- 私人回忆与跨展厅同步仍待接入，ZFxF 地图软件保持单独存在。
+
 ## 已经完成
 
 - 首页只是一个非常轻的入口。卡片直接使用原项目的图像、纸纹和字体。
