@@ -25,7 +25,7 @@ test("only known flow stages are shown", () => {
 });
 test("after the first bouquet, no extra invitation page is interposed", () => {
   const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../romance/index.html"), "utf8");
-  assert.match(html, /id="goToDate"[^>]*href="\\?stage=date"[^>]*>花收好了/);
+  assert.match(html, /id="goToDate"[^>]*href="\?stage=date"[^>]*>花收好了/);
   assert.doesNotMatch(html, /data-stage="invite"/);
   assert.match(html, /data-stage="date"/);
   assert.match(html, /id="dateFrame"/);
