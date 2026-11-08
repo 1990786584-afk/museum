@@ -5,7 +5,7 @@ import WebKit
 /// Native SwiftUI museum entrance. The two original *exhibitions* use their
 /// original web renderers inside WKWebView, never in external Safari.
 /// This is an iPhone app, not a PWA shortcut or a website home screen.
-private enum MuseumExhibit: Equatable {
+private enum MuseumExhibit: Hashable {
     case sky
     case datesDemo
     case romance
