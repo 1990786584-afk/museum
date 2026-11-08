@@ -18,9 +18,9 @@ private enum MuseumExhibit: Hashable {
         case .datesDemo:
             return URL(string: "https://1990786584-afk.github.io/museum/dates/")!
         case .romance:
-            return URL(string: "https://1990786584-afk.github.io/museum/romance/")!
+            return URL(string: "https://1990786584-afk.github.io/museum/romance/?v=20261108-ephemera-direct")!
         case .afterFlower:
-            return URL(string: "https://1990786584-afk.github.io/museum/romance/?stage=after")!
+            return URL(string: "https://1990786584-afk.github.io/museum/romance/?stage=after&v=20261108-ephemera-direct")!
         }
     }
 }
