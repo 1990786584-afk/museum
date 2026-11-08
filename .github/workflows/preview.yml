@@ -1,4 +1,4 @@
-name: Museum preview — original UI only
+name: Museum preview — original exhibits + flower date
 on:
   push:
     branches: [main]
@@ -28,7 +28,7 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: sources/ephemera-date/web/package-lock.json
-      - name: Build the two original exhibitions
+      - name: Build two original exhibitions and flower-date flow
         run: ./scripts/build-preview.sh /museum
       - name: Save preview even if Pages is not enabled
         uses: actions/upload-artifact@v4

@@ -1,0 +1,28 @@
+/* Launcher-only stationery: the 3D florist and Ephemera run in untouched iframes. */
+@font-face{font-family:"IM Fell";font-style:italic;src:url("../gallery/assets/imfell-400i.woff2") format("woff2")}
+:root{color-scheme:light;font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;color:#4d493e}
+*{box-sizing:border-box}
+html{min-height:100%}
+body{min-height:100svh;margin:0;padding:clamp(12px,4vw,32px);background:#d6d8d3 url("../gallery/assets/sky.webp") center/cover fixed no-repeat}
+.paper{width:min(100%,850px);margin:auto;padding:clamp(17px,4vw,38px);background:#f5efe4 url("../gallery/assets/paper.webp") repeat;border:1px solid #a99985;box-shadow:0 10px 36px rgba(63,57,48,.16);text-align:center}
+.eyebrow,.folio{font:italic 16px "IM Fell",Georgia,serif;letter-spacing:.11em}
+.folio{color:#846c52;margin:26px 0 7px}
+h1{font:normal clamp(23px,5.8vw,37px) Georgia,"Songti SC",serif;line-height:1.5;margin:9px 0}
+.caption{font-size:14px;line-height:1.9;max-width:36em;margin:8px auto 19px}
+.scene[hidden]{display:none}
+.flower-frame,.date-frame{display:block;width:100%;border:1px solid #b9a998;background:#f3ebdd;border-radius:2px}
+.flower-frame{height:clamp(420px,69dvh,770px)}
+.date-frame{height:clamp(500px,76dvh,830px);background:#fbf6ef}
+.help{font-size:12px;line-height:1.8;opacity:.8;margin:12px 0 18px}
+.paper-button{display:flex;align-items:center;justify-content:center;gap:15px;min-height:50px;padding:10px 16px;margin:17px auto 8px;max-width:380px;background:#f8f1e4;border:1px solid #9e856b;box-shadow:0 2px 7px rgba(70,55,37,.08);font-size:15px;letter-spacing:.07em;text-decoration:none;color:#4d493e}
+.paper-button:focus-visible,.quiet-link:focus-visible{outline:3px solid #846d57;outline-offset:3px}
+.paper-button:hover{background:#f0e5d6}
+.quiet-link{display:inline-block;color:#716250;font-size:13px;margin:8px}
+.envelope{width:min(90%,450px);margin:24px auto 26px}
+.envelope img{display:block;width:100%;max-height:510px;object-fit:contain;filter:sepia(.3) saturate(.7);border:1px solid #c6b39b}
+.envelope figcaption{font:italic 15px "IM Fell",Georgia,serif;padding-top:10px;letter-spacing:.1em}
+footer{border-top:1px solid rgba(125,103,80,.3);margin-top:30px;padding-top:17px;font:italic 15px "IM Fell",Georgia,serif;line-height:1.9}
+footer span{font:normal 10px Georgia,serif;opacity:.7}
+footer a{color:inherit}
+@media(max-width:540px){body{padding:10px}.paper{padding:18px 12px}.flower-frame{height:69dvh;min-height:420px}.date-frame{height:73dvh;min-height:490px}.folio{margin-top:17px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}

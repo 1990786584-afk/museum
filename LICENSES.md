@@ -1,6 +1,6 @@
 # Upstream credits and licenses
 
-The two exhibitions remain **separate unmodified upstream applications**,
+The two original exhibitions remain **separate unmodified upstream applications**,
 linked as pinned Git submodules. This prevents accidental mixing of licenses and
 preserves the original visual styles.
 
@@ -22,3 +22,12 @@ into one derivative program under a single license.
 
 Our separate museum launcher is available for private personal adaptation;
 it grants no rights to the upstream projects or images.
+
+3. **CyberFlowerShop / 赛博花店** — frycarrot,
+   https://github.com/frycarrot/CyberFlowerShop. The bouquet experience is
+   embedded as a cross-origin iframe pointing at the author's public site
+   (https://frycarrot.github.io/CyberFlowerShop/). We do not copy, fork,
+   restyle, bundle, or republish its original source or font assets.
+   The source repository has no clear root code license as inspected on
+   2026-11-08; its published availability is not assumed to be a grant
+   of redistribution rights. The attribution remains visible in the flow.

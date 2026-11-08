@@ -12,8 +12,10 @@ test -f "$ROOT/sources/ephemera-date/web/package.json" || { echo "Missing Epheme
 
 # Do not carry stale build artifacts, or anything private.
 rm -rf "$OUT"
-mkdir -p "$OUT/gallery" "$OUT/dates" "$OUT/museum-assets"
+mkdir -p "$OUT/gallery" "$OUT/dates" "$OUT/museum-assets" "$OUT/romance"
 cp "$ROOT/index.html" "$OUT/index.html"
+# Date story is our own orchestration only; CyberFlowerShop remains hosted by its author.
+cp "$ROOT/romance/index.html" "$ROOT/romance/style.css" "$ROOT/romance/flow.js" "$OUT/romance/"
 cp "$ROOT/sources/ephemera-date/docs/images/01-envelope.jpg" "$OUT/museum-assets/ephemera-envelope.jpg"
 cp "$ROOT/sources/ephemera-date/docs/images/05-box.jpg" "$OUT/museum-assets/ephemera-box.jpg"
 

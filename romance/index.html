@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5eee2">
+  <title>ZFxF · A Date, Two Bouquets</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./flow.js" defer></script>
+</head>
+<body>
+  <main class="paper">
+    <div class="eyebrow">ZFxF · A little invitation</div>
+
+    <section class="scene" data-stage="before" hidden>
+      <p class="folio">I · For you</p>
+      <h1>念念，先给你一束花。</h1>
+      <p class="caption">先收花，再听我说今天的邀请。</p>
+      <iframe id="firstBouquet" class="flower-frame" title="Finnian 送给念念的第一束 3D 花" referrerpolicy="no-referrer" loading="eager"></iframe>
+      <p class="help">可以旋转花束、点开贺卡，慢慢看，不着急。</p>
+      <a class="paper-button" href="?stage=invite">花收好了 · 看看邀请函 <span aria-hidden="true">→</span></a>
+    </section>
+
+    <section class="scene" data-stage="invite" hidden>
+      <p class="folio">II · An invitation</p>
+      <h1>念念，今天跟我约会吧。</h1>
+      <p class="caption">我把时间留给你。我们去看看那些写在纸上、藏进云里的日子。</p>
+      <figure class="envelope">
+        <img src="../museum-assets/ephemera-envelope.jpg" alt="Ephemera 原作的火漆信封">
+        <figcaption>an invitation, kept for you</figcaption>
+      </figure>
+      <a id="acceptDate" class="paper-button" href="?stage=date">接受邀请 · 去约会 <span aria-hidden="true">→</span></a>
+      <a class="quiet-link" href="?stage=before">再看一眼刚才的花</a>
+    </section>
+
+    <section class="scene" data-stage="date" hidden>
+      <p class="folio">III · Our date</p>
+      <h1>这一页，交给我们。</h1>
+      <p class="caption">在 Ephemera 的原版信封、连票和纪念盒里度过一小段约会。</p>
+      <iframe id="dateFrame" class="date-frame" title="Ephemera 原版约会体验" loading="lazy"></iframe>
+      <p class="help">公开预览展示原作者的模拟约会；私人约会只在已连接的 iOS App 中开启。</p>
+      <a class="paper-button" href="?stage=after">今天先到这里 · 还有花给你 <span aria-hidden="true">→</span></a>
+    </section>
+
+    <section class="scene" data-stage="after" hidden>
+      <p class="folio">IV · Still, for you</p>
+      <h1>结束时，也舍不得空手送你走。</h1>
+      <p class="caption">第一束花是邀请。这一束，是我还想再见你的心意。</p>
+      <iframe id="lastBouquet" class="flower-frame" title="Finnian 送给念念的第二束 3D 花" referrerpolicy="no-referrer" loading="eager"></iframe>
+      <a class="paper-button" href="../">带着花回纪念馆 <span aria-hidden="true">→</span></a>
+      <a class="quiet-link" href="?stage=before">想再赴一次约</a>
+    </section>
+
+    <footer>Zoey &amp; Finnian · since December 14, 2024<br>
+      <span>Flowers by <a href="https://github.com/frycarrot/CyberFlowerShop" rel="noopener noreferrer" target="_blank">CyberFlowerShop</a> · Date experience by Ephemera</span>
+    </footer>
+  </main>
+</body>
+</html>

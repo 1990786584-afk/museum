@@ -2,12 +2,14 @@ import SafariServices
 import SwiftUI
 import WebKit
 
-/// Native SwiftUI museum entrance. The two *exhibitions* use their
+/// Native SwiftUI museum entrance. The two original *exhibitions* use their
 /// original web renderers inside WKWebView, never in external Safari.
 /// This is an iPhone app, not a PWA shortcut or a website home screen.
 private enum MuseumExhibit: Equatable {
     case sky
     case datesDemo
+    case romance
+    case afterFlower
 
     var url: URL {
         switch self {
@@ -15,6 +17,10 @@ private enum MuseumExhibit: Equatable {
             return URL(string: "https://1990786584-afk.github.io/museum/gallery/")!
         case .datesDemo:
             return URL(string: "https://1990786584-afk.github.io/museum/dates/")!
+        case .romance:
+            return URL(string: "https://1990786584-afk.github.io/museum/romance/")!
+        case .afterFlower:
+            return URL(string: "https://1990786584-afk.github.io/museum/romance/?stage=after")!
         }
     }
 }
@@ -27,6 +33,7 @@ struct MuseumHomeView: View {
     @State private var showLocation = false
     @State private var galleryNotice = ""
     @State private var isInsideExhibit = false
+    @State private var returnWithFlowers = false
 
     var body: some View {
         ZStack {
@@ -75,6 +82,7 @@ struct MuseumHomeView: View {
                                   config: host.config, startURL: exhibit.url,
                                   onOpenLiveDates: {
                         guard host.config.isConfigured else { return false }
+                        if exhibit == .romance { returnWithFlowers = true }
                         host.open(route: nil)
                         return true
                     }, onOpenBox: { id in
@@ -84,6 +92,7 @@ struct MuseumHomeView: View {
                     }, onGalleryError: { reason in
                         galleryNotice = reason
                     })
+                    .id(exhibit) // Reload when private Ephemera closes and a second bouquet replaces the invitation.
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 // The exhibit's own tab bar must reach the home-indicator
@@ -92,6 +101,10 @@ struct MuseumHomeView: View {
             } else {
                 NativeMuseumEntrance(
                     openSky: { exhibit = .sky },
+                    openRomance: {
+                        returnWithFlowers = false
+                        exhibit = .romance
+                    },
                     openDates: {
                         if host.config.isConfigured {
                             host.open(route: nil)
@@ -107,7 +120,7 @@ struct MuseumHomeView: View {
         .background {
             // The painted sky fills the entire screen, including the bottom
             // home-indicator inset. The Ephemera demo uses its paper colour.
-            if exhibit == .datesDemo {
+            if exhibit == .datesDemo || exhibit == .romance || exhibit == .afterFlower {
                 Color(red: 0.985, green: 0.965, blue: 0.937)
                     .ignoresSafeArea()
             } else {
@@ -130,10 +143,18 @@ struct MuseumHomeView: View {
             Text(galleryNotice)
         }
         .onChange(of: host.pageOpen) { _, isOpen in
-            if !isOpen { browser.refreshPrivateGallery?() }
+            guard !isOpen else { return }
+            browser.refreshPrivateGallery?()
+            if returnWithFlowers {
+                // Returning from the private date does not claim it was saved or completed.
+                // It merely offers another bouquet when she chooses to leave Ephemera.
+                returnWithFlowers = false
+                exhibit = .afterFlower
+            }
         }
         .onChange(of: host.config.isConfigured) { _, connected in
             guard !connected else { return }
+            returnWithFlowers = false
             exhibit = nil
             browser.webView?.configuration.websiteDataStore.httpCookieStore
                 .getAllCookies { cookies in
@@ -163,6 +184,7 @@ struct MuseumHomeView: View {
 /// never overwritten. No web address is opened by the home buttons.
 private struct NativeMuseumEntrance: View {
     let openSky: () -> Void
+    let openRomance: () -> Void
     let openDates: () -> Void
     let openLocation: () -> Void
     let openSettings: () -> Void
@@ -202,6 +224,31 @@ private struct NativeMuseumEntrance: View {
                                 .tracking(4)
                         }
                         .padding(.bottom, 5)
+
+                        Button(action: openRomance) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gift")
+                                    .font(.system(size: 25, weight: .ultraLight))
+                                    .frame(width: 33)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("先收一束花，再跟我去约会")
+                                        .font(.system(size: 15, design: .serif))
+                                    Text("一封邀请 · 一场约会 · 结束时还有花")
+                                        .font(.system(size: 11, design: .serif))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12))
+                            }
+                            .padding(13)
+                            .background(Color(red: 0.99, green: 0.97, blue: 0.91).opacity(0.75))
+                            .overlay {
+                                Rectangle().strokeBorder(Color(red: 0.68, green: 0.62, blue: 0.54), lineWidth: 0.8)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("native-romance")
 
                         HStack(alignment: .top, spacing: 12) {
                             ExhibitCard(
@@ -335,6 +382,16 @@ private struct MuseumBrowser: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        if startURL.path == "/museum/romance/" {
+            // Only tell our own wrapper whether a private host is configured;
+            // never expose its URL, bearer credential or cookies to the florist iframe.
+            let available = config.isConfigured ? "true" : "false"
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "window.__MUSEUM_HAS_PRIVATE_DATES__ = " + available + ";",
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            ))
+        }
         if startURL.path == "/museum/dates/" {
             // The demo's own floating pill overlaps page headings on iPhone.
             // Hide only that test control, without changing the upstream

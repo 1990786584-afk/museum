@@ -1,9 +1,21 @@
 # ZFxF · The Museum of Us
 
-**两间展厅，一座私人纪念馆。ZFxF 地图／藏信仍然单独保留。**
+**两间原版展厅、一段送花约会序章。ZFxF 地图／藏信仍然单独保留。**
 
 这是念念新建的 museum 仓库。**以原作为准**，不改动 Shelf in the Sky 和
 Ephemera 的字体、排版、相纸、天空、火漆、纸品和内部交互。
+
+## 💐 新增：先收花，再赴约，最后再收花
+
+入口：[A Date, Two Bouquets](romance/)；线上预览路径是 `/museum/romance/`。
+
+1. Finnian 先送一束可旋转的 3D 花，点花和贺卡使用 CyberFlowerShop **原站**的交互。
+2. 收花后打开纸质邀请函，再进入 Ephemera 的原版约会体验。
+3. 公开预览只走 Ephemera 官方演示，可手动选择结束试玩，然后收到第二束花；iOS 已连接私人 Ephemera 的情况下，赴约会进入**已有原生私密约会**，返回后出现第二束花。
+4. 结束花保留独立寄语，回到纪念馆可继续原来的两间展厅；**这段流程不会捏造或提交真实约会记录**。
+
+花店原项目：[frycarrot/CyberFlowerShop](https://github.com/frycarrot/CyberFlowerShop)。
+因上游仓库目前没有明确的根目录代码许可证，本项目仅通过独立跨站 iframe 嵌入原作者已经公开托管的花店，**不复制、修改、再托管其源码、字体或 3D 模型**。需要联网访问原网站。只有花束码和非敏感寄语作为 iframe 地址的 URL fragment 传递给原站前端；不传私密服务的口令、照片或位置。
 
 ## 📱 iPhone 原生应用（SwiftUI 首页 + 原版展厅）
 
@@ -21,7 +33,7 @@ Ephemera 的字体、排版、相纸、天空、火漆、纸品和内部交互�
   照片墙和一叠相片三种模式。
 - dates/：**Ephemera** 原始视觉与互动演示（官方 demo 模式，假数据和快进时钟）。
   信封、邀请函、连票、地图和纪念盒来自原项目。
-- 2 个项目通过**独立锁定版本的 Git submodule** 引入，不改原始 CSS／组件。
+- Shelf 与 Ephemera 两个项目通过**独立锁定版本的 Git submodule** 引入，不改原始 CSS／组件；赛博花店使用原站 iframe，不复制未授权源码。
 - GitHub Actions 自动构建静态预览，不上传任何私人回忆。
 
 ## 体验方式
@@ -64,14 +76,15 @@ python3 -m http.server 8000 --directory preview
 
 - sources/shelf-in-the-sky/ — Git submodule，原版照片展厅。
 - sources/ephemera-date/ — Git submodule，原版约会纸品展厅。
-- index.html — 只负责选择两个展厅的入口，不承担展厅视觉设计。
+- index.html — 展厅入口及送花约会入口，保留两间原作展厅的外观与内容。
+- romance/ — 独立薄包装层：原站 3D 花束 → 邀约 → 原版 Ephemera 约会 → 第二束花。
 - scripts/build-preview.sh — 生成不含私有信息的浏览器演示。
 - scripts/check-preview.sh — 校验素材与隐私、验证两间展厅都在。
 - .github/workflows/preview.yml — GitHub Pages 自动构建与部署。
 
 > ZFxF makes moments. Our museum keeps them.
 
-## 🔗 两间展厅的数据互通
+## 🔗 两间原版展厅的数据互通
 
 已加入独立的私有同步服务：`bridge/`，可将 Ephemera 已结束的约会
 及有效上传照片同步至**私有版** Shelf in the Sky。照片由原作者的
