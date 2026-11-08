@@ -247,7 +247,7 @@ struct MuseumFlexibleDateSheet: View {
             // mere successful button animation or an unverified local time.
             await load()
         } catch {
-            error = "暂时没有记进去，请重试。原来的票根不会被误标为完成。"
+            self.error = "暂时没有记进去，请重试。原来的票根不会被误标为完成。"
         }
         busyStop = nil
     }
