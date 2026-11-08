@@ -38,79 +38,39 @@ struct MuseumHomeView: View {
     var body: some View {
         ZStack {
             if let exhibit {
-                // A real native header occupies its own vertical space; the
-                // web renderer never starts underneath our back button.
-                VStack(spacing: 0) {
-                    HStack(spacing: 12) {
-                        Button {
-                            // The demo opened via flowers ends with a gift.
-                            // A directly opened Ephemera exhibition still returns home.
-                            if exhibit == .datesDemo && returnWithFlowers {
-                                returnWithFlowers = false
-                                self.exhibit = .afterFlower
-                            } else {
-                                self.exhibit = nil
-                            }
-                        } label: {
-                            Label(exhibit == .datesDemo && returnWithFlowers ? "结束约会 · 收花" : "纪念馆",
-                                  systemImage: "chevron.left")
-                                .font(.system(size: 15, weight: .medium))
-                                .padding(.horizontal, 13)
-                                .frame(height: 40)
-                                .background(.regularMaterial, in: Capsule())
-                        }
-                        .accessibilityIdentifier("museum-native-back")
-                        .buttonStyle(.plain)
-
-                        Spacer(minLength: 8)
-
-                        if exhibit == .datesDemo {
-                            // Keep Ephemera's demo fast-forward working, but
-                            // place its control in our dedicated native bar.
-                            Button {
-                                browser.advanceDemo()
-                            } label: {
-                                Label("试玩 · 快进", systemImage: "forward.fill")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 36)
-                                    .background(.regularMaterial, in: Capsule())
-                            }
-                            .accessibilityLabel("试玩：推进到下一个约会阶段")
-                            .accessibilityIdentifier("museum-demo-next")
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .foregroundStyle(Color(red: 0.30, green: 0.28, blue: 0.23))
-                    .padding(.horizontal, 16)
-                    .frame(height: 56)
-                    .background(Color(red: 0.985, green: 0.965, blue: 0.937))
-
-                    MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
-                                  config: host.config, startURL: exhibit.url,
-                                  onOpenLiveDates: {
-                        guard host.config.isConfigured else { return false }
-                        if exhibit == .romance { returnWithFlowers = true }
-                        host.open(route: nil)
-                        return true
-                    }, onOpenDemoDates: {
-                        guard exhibit == .romance && !host.config.isConfigured else { return false }
-                        returnWithFlowers = true
-                        self.exhibit = .datesDemo
-                        return true
-                    }, onOpenBox: { id in
-                        guard host.config.isConfigured else { return false }
-                        host.open(route: ["page": "box", "planId": id])
-                        return true
-                    }, onGalleryError: { reason in
-                        galleryNotice = reason
-                    })
-                    .id(exhibit) // Reload when private Ephemera closes and a second bouquet replaces the invitation.
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                // The exhibit's own tab bar must reach the home-indicator
-                // edge, not stop above a white system-safe-area strip.
+                // The original exhibition fills the entire available viewport;
+                // no 56-point host navigation bar sits above its artwork.
+                MuseumBrowser(holder: browser, insideExhibit: $isInsideExhibit,
+                              config: host.config, startURL: exhibit.url,
+                              onOpenLiveDates: {
+                    guard host.config.isConfigured else { return false }
+                    if exhibit == .romance { returnWithFlowers = true }
+                    host.open(route: nil)
+                    return true
+                }, onOpenDemoDates: {
+                    guard exhibit == .romance && !host.config.isConfigured else { return false }
+                    returnWithFlowers = true
+                    self.exhibit = .datesDemo
+                    return true
+                }, onOpenBox: { id in
+                    guard host.config.isConfigured else { return false }
+                    host.open(route: ["page": "box", "planId": id])
+                    return true
+                }, onGalleryError: { reason in
+                    galleryNotice = reason
+                })
+                .id(exhibit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Extend the artwork to the home indicator; respect the status
+                // bar/dynamic island so upstream controls stay accessible.
                 .ignoresSafeArea(edges: .bottom)
+                .overlay(alignment: .topLeading) {
+                    MuseumBookmark(exitTitle: exhibit == .datesDemo && returnWithFlowers
+                        ? "结束约会 · 收花" : "返回纪念馆") {
+                        exitExhibit(exhibit)
+                    }
+                    .padding(.top, 96)
+                }
             } else {
                 NativeMuseumEntrance(
                     openSky: { exhibit = .sky },
@@ -185,10 +145,117 @@ struct MuseumHomeView: View {
             MuseumLocationView()
         }
         .fullScreenCover(isPresented: $host.pageOpen) {
-            // Original Ephemera invitation, wax seal, and ticket renderer.
+            // Private Ephemera already has its own immersive host. Use the
+            // same small bookmark rather than placing a new header on top.
             EphemeraPage(config: host.config, route: host.pendingRoute)
                 .ignoresSafeArea()
+                .overlay(alignment: .topLeading) {
+                    MuseumBookmark(exitTitle: returnWithFlowers
+                        ? "结束约会 · 收花" : "返回纪念馆") {
+                        host.navigateOpenPage = nil
+                        host.pageOpen = false
+                        // The existing pageOpen observer decides whether
+                        // to show the second bouquet or return to Museum.
+                    }
+                    .padding(.top, 96)
+                }
         }
+    }
+
+    private func exitExhibit(_ current: MuseumExhibit) {
+        if current == .datesDemo && returnWithFlowers {
+            // Exiting a demo reached from the first bouquet offers the second.
+            // It does not mark the underlying Ephemera date as completed.
+            returnWithFlowers = false
+            exhibit = .afterFlower
+        } else {
+            returnWithFlowers = false
+            exhibit = nil
+        }
+    }
+}
+
+/// A small, native, nonmodal exit affordance shared by all exhibition renderers.
+/// It stays out of the original pages' layout and never injects custom CSS.
+private struct MuseumBookmark: View {
+    let exitTitle: String
+    let onExit: () -> Void
+    @State private var expanded = false
+
+    private let ink = Color(red: 0.30, green: 0.28, blue: 0.23)
+    private let paper = Color(red: 0.985, green: 0.965, blue: 0.937)
+    private let stroke = Color(red: 0.66, green: 0.58, blue: 0.47)
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    expanded.toggle()
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 15, weight: .light))
+                    Text("馆")
+                        .font(.system(size: 11, design: .serif))
+                }
+                .frame(width: 42, height: 56)
+                .background(paper.opacity(0.94), in: RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(stroke.opacity(0.75), lineWidth: 0.8)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 5, x: 1, y: 3)
+            }
+            .accessibilityLabel(expanded ? "收起纪念馆书签" : "打开纪念馆书签")
+            .accessibilityHint("展开返回纪念馆的选项")
+            .accessibilityIdentifier("museum-bookmark-toggle")
+
+            if expanded {
+                VStack(alignment: .leading, spacing: 11) {
+                    Text("ZFxF · The Museum of Us")
+                        .font(.custom("Georgia-Italic", size: 15))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Rectangle()
+                        .fill(stroke.opacity(0.35))
+                        .frame(height: 0.7)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            expanded = false
+                        }
+                    } label: {
+                        Label("继续参观", systemImage: "eye")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityIdentifier("museum-bookmark-continue")
+
+                    Button {
+                        expanded = false
+                        onExit()
+                    } label: {
+                        Label(exitTitle, systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityIdentifier("museum-bookmark-exit")
+                }
+                .font(.system(size: 14, design: .serif))
+                .padding(15)
+                .frame(width: 238, alignment: .leading)
+                .background(paper.opacity(0.98), in: RoundedRectangle(cornerRadius: 4))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(stroke.opacity(0.75), lineWidth: 0.8)
+                }
+                .shadow(color: .black.opacity(0.16), radius: 12, x: 1, y: 6)
+                .transition(.opacity.combined(with: .move(edge: .leading)))
+            }
+        }
+        .foregroundStyle(ink)
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -365,20 +432,7 @@ final class MuseumBrowserHolder: ObservableObject {
         webView?.load(URLRequest(url: Self.home, cachePolicy: .useProtocolCachePolicy))
     }
 
-    /// Ephemera's upstream demo still owns all state and advance logic.
-    /// The iOS button simply invokes its existing testID press handler.
-    func advanceDemo() {
-        guard let webView,
-              webView.url?.path.hasPrefix("/museum/dates/") == true else { return }
-        webView.evaluateJavaScript("""
-          (() => {
-            const button = document.querySelector('[data-testid="demo-step"]');
-            if (!button) return false;
-            button.click();
-            return true;
-          })()
-          """) { _, _ in }
-    }
+
 }
 
 private struct MuseumBrowser: UIViewRepresentable {
@@ -403,19 +457,6 @@ private struct MuseumBrowser: UIViewRepresentable {
                 injectionTime: .atDocumentStart,
                 forMainFrameOnly: true
             ))
-        }
-        if startURL.path == "/museum/dates/" {
-            // The demo's own floating pill overlaps page headings on iPhone.
-            // Hide only that test control, without changing the upstream
-            // design or its JS fast-forward handler (see advanceDemo()).
-            let script = WKUserScript(source: """
-                (() => {
-                  const style = document.createElement('style');
-                  style.textContent = '[data-testid="demo-step"] { visibility: hidden !important; }';
-                  (document.head || document.documentElement).appendChild(style);
-                })();
-                """, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-            configuration.userContentController.addUserScript(script)
         }
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.isOpaque = false

@@ -21,6 +21,8 @@ jobs:
         run: xcodebuild -version
       - name: Check Xcode project structure
         run: plutil -lint ios/Museum.xcodeproj/project.pbxproj
+      - name: Check immersive exhibition shell and exit routes
+        run: python3 ios/tests/test_exhibit_shell.py
       - name: Build for iOS Simulator without device signing
         run: |
           set -o pipefail
