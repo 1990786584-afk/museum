@@ -34,6 +34,7 @@ struct MuseumHomeView: View {
     @State private var galleryNotice = ""
     @State private var isInsideExhibit = false
     @State private var returnWithFlowers = false
+    @State private var showFlexibleDates = false
 
     var body: some View {
         ZStack {
@@ -151,13 +152,16 @@ struct MuseumHomeView: View {
                 .ignoresSafeArea()
                 .overlay(alignment: .topLeading) {
                     MuseumBookmark(exitTitle: returnWithFlowers
-                        ? "结束约会 · 收花" : "返回纪念馆") {
+                        ? "结束约会 · 收花" : "返回纪念馆",
+                                   onFlexibleDates: { showFlexibleDates = true }) {
                         host.navigateOpenPage = nil
                         host.pageOpen = false
                         // The existing pageOpen observer decides whether
                         // to show the second bouquet or return to Museum.
                     }
-
+                }
+                .sheet(isPresented: $showFlexibleDates) {
+                    MuseumFlexibleDateSheet(config: host.config)
                 }
         }
     }
@@ -180,6 +184,14 @@ struct MuseumHomeView: View {
 private struct MuseumBookmark: View {
     let exitTitle: String
     let onExit: () -> Void
+    let onFlexibleDates: (() -> Void)?
+
+    init(exitTitle: String, onFlexibleDates: (() -> Void)? = nil,
+         onExit: @escaping () -> Void) {
+        self.exitTitle = exitTitle
+        self.onFlexibleDates = onFlexibleDates
+        self.onExit = onExit
+    }
 
     // Shared by the Shelf, Ephemera demo and the private date host:
     // moving the tab in one exhibition also moves it in the others.
@@ -274,6 +286,17 @@ private struct MuseumBookmark: View {
             Rectangle()
                 .fill(stroke.opacity(0.32))
                 .frame(height: 0.7)
+
+            if let onFlexibleDates {
+                Button {
+                    expanded = false
+                    onFlexibleDates()
+                } label: {
+                    Label("随心记录 · P 人约会", systemImage: "checkmark.seal")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityIdentifier("museum-free-date-open")
+            }
 
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) {

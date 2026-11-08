@@ -17,11 +17,13 @@ import mimetypes
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import threading
 import time
 from urllib.parse import unquote, urlsplit
 
 from sync import EphemeraClient, sync_gallery
+from flexible_dates import FlexibleDateError, list_active, check_in
 
 PREFIX = "/museum-gallery"
 SESSION_SECONDS = 3600
@@ -122,6 +124,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == PREFIX + "/free-dates/check-in":
+            if not self.server.state.bearer_ok(self.headers.get("Authorization", "")):
+                self.respond(401, b'{"error":"unauthorized"}')
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if not 1 <= size <= 1024:
+                    raise FlexibleDateError(400, "invalid_body")
+                body = json.loads(self.rfile.read(size))
+                if not isinstance(body, dict) or set(body) != {"planId", "stopId"}:
+                    raise FlexibleDateError(400, "invalid_body")
+                output = check_in(plan_id=body["planId"], stop_id=body["stopId"])
+            except FlexibleDateError as err:
+                self.respond(err.status, json.dumps({"error": str(err)}).encode())
+                return
+            except sqlite3.Error:
+                self.respond(503, b'{"error":"date_service_unavailable"}')
+                return
+            except (ValueError, OSError, json.JSONDecodeError):
+                self.respond(400, b'{"error":"invalid_body"}')
+                return
+            self.respond(200, json.dumps(output).encode())
+            return
         if path not in (PREFIX + "/session", PREFIX + "/sync"):
             self.respond(404, b'{"error":"not_found"}')
             return
@@ -147,6 +172,17 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == PREFIX + "/healthz":
             self.respond(200, b'{"ok":true}')
+            return
+        if path == PREFIX + "/free-dates":
+            if not self.server.state.bearer_ok(self.headers.get("Authorization", "")):
+                self.respond(401, b'{"error":"unauthorized"}')
+                return
+            try:
+                payload = list_active()
+            except (sqlite3.Error, OSError, FlexibleDateError):
+                self.respond(503, b'{"error":"date_service_unavailable"}')
+                return
+            self.respond(200, json.dumps(payload, ensure_ascii=False).encode())
             return
         if path == PREFIX + "/status":
             if not self.server.state.bearer_ok(self.headers.get("Authorization", "")):

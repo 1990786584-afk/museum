@@ -97,3 +97,18 @@ python3 -m http.server 8000 --directory preview
 - 私人引擎与同步桥已经在自有 VPS 上部署；用户仍需在 iPhone 手动填写 HTTPS 地址和私密口令。
 - 在没有配置或安全检查失败之前，iOS 会明确提示同步不可用，
   自动回到公开示例，不假装已经互通。
+
+
+## Flexible date check-ins (private native Museum)
+For a user-approved live date, the native Museum bookmark exposes **随心记录**.
+The small same-origin authenticated bridge provides `GET /museum-gallery/free-dates`
+and `POST /museum-gallery/free-dates/check-in` with `{planId, stopId}`.
+Enable a specific plan in the **private server environment only**, e.g.
+`MUSEUM_FLEX_DATE_IDS=2`; other plans remain on the original Ephemera
+time-gated behavior. This opt-in records a real server timestamp directly
+in Ephemera's own `checkin:<stop_id>` marks without fabricating a planned
+time; the original UI still prints the original planned itinerary. The
+companion page clearly presents actual completion times, supports late/out-
+of-order taps, and never auto-completes remaining stops. No source changes
+are made inside the upstream submodules. The her-side token is required
+for both endpoints. **A deadline in FinnianOS is a separate mechanism**.
