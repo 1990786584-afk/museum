@@ -10,8 +10,8 @@ Ephemera 的字体、排版、相纸、天空、火漆、纸品和内部交互�
 入口：[A Date, Two Bouquets](romance/)；线上预览路径是 `/museum/romance/`。
 
 1. Finnian 先送一束可旋转的 3D 花，点花和贺卡使用 CyberFlowerShop **原站**的交互。
-2. 收花后打开纸质邀请函，再进入 Ephemera 的原版约会体验。
-3. 公开预览只走 Ephemera 官方演示，可手动选择结束试玩，然后收到第二束花；iOS 已连接私人 Ephemera 的情况下，赴约会进入**已有原生私密约会**，返回后出现第二束花。
+2. 点击「花收好了 · 看看邀请函」**直接打开原版 Ephemera Invitation Box 首页**，不再经过另外制作的邀请过渡页。
+3. 网页预览直接显示 Ephemera 官方演示界面，并保留顶部结束后收花按钮；iOS 无私人配置时直接进入原版 Ephemera 演示展厅，点「结束约会 · 收花」拿到第二束花；配置私人约会后直接进入原生 Ephemera，退出后收到第二束花。
 4. 结束花保留独立寄语，回到纪念馆可继续原来的两间展厅；**这段流程不会捏造或提交真实约会记录**。
 
 花店原项目：[frycarrot/CyberFlowerShop](https://github.com/frycarrot/CyberFlowerShop)。
@@ -77,7 +77,7 @@ python3 -m http.server 8000 --directory preview
 - sources/shelf-in-the-sky/ — Git submodule，原版照片展厅。
 - sources/ephemera-date/ — Git submodule，原版约会纸品展厅。
 - index.html — 展厅入口及送花约会入口，保留两间原作展厅的外观与内容。
-- romance/ — 独立薄包装层：原站 3D 花束 → 邀约 → 原版 Ephemera 约会 → 第二束花。
+- romance/ — 独立薄包装层：原站 3D 花束 → 原版 Ephemera Invitation Box → 第二束花。
 - scripts/build-preview.sh — 生成不含私有信息的浏览器演示。
 - scripts/check-preview.sh — 校验素材与隐私、验证两间展厅都在。
 - .github/workflows/preview.yml — GitHub Pages 自动构建与部署。

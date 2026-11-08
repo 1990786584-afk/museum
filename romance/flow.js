@@ -1,4 +1,4 @@
-/* Four-step host flow. Never changes either upstream application's CSS or scripts. */
+/* Bouquet -> original Ephemera -> another bouquet. Keep upstream apps unmodified. */
 (function (root) {
   "use strict";
 
@@ -10,7 +10,8 @@
 
   function stageFromSearch(search) {
     const stage = new URLSearchParams(search || "").get("stage");
-    return ["before", "invite", "date", "after"].includes(stage) ? stage : "before";
+    if (stage === "invite") return "date"; // Old URLs skip the removed intermediate page.
+    return ["before", "date", "after"].includes(stage) ? stage : "before";
   }
 
   function bouquetURL(phase) {
@@ -18,8 +19,9 @@
     return FLORIST + "#" + encodeURIComponent(MARKERS[phase]);
   }
 
-  function render(doc, location, liveDates) {
+  function render(doc, location, nativeHost) {
     const stage = stageFromSearch(location.search);
+    doc.body.dataset.activeStage = stage;
     doc.querySelectorAll("[data-stage]").forEach(function (section) {
       section.hidden = section.getAttribute("data-stage") !== stage;
     });
@@ -32,12 +34,10 @@
     if (stage === "date") {
       doc.getElementById("dateFrame").src = "../dates/";
     }
-    const acceptDate = doc.getElementById("acceptDate");
-    if (liveDates) {
-      acceptDate.href = "../dates/";
-      // The native WKWebView navigation delegate routes this URL to the
-      // authenticated Ephemera host. Closing it returns to the second flowers.
-    }
+    // Native uses the actual standalone Ephemera exhibit; its navigation delegate
+    // selects the private original or the public demo. Browser preview retains
+    // its immersive Ephemera iframe so she can come back for another bouquet.
+    doc.getElementById("goToDate").href = nativeHost ? "../dates/" : "?stage=date";
     return stage;
   }
 
@@ -45,7 +45,7 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     window.addEventListener("DOMContentLoaded", function () {
-      render(document, window.location, window.__MUSEUM_HAS_PRIVATE_DATES__ === true);
+      render(document, window.location, window.__MUSEUM_IN_APP__ === true);
     });
   }
 })(typeof globalThis === "object" ? globalThis : this);

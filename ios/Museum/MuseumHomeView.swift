@@ -43,9 +43,17 @@ struct MuseumHomeView: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
                         Button {
-                            self.exhibit = nil
+                            // The demo opened via flowers ends with a gift.
+                            // A directly opened Ephemera exhibition still returns home.
+                            if exhibit == .datesDemo && returnWithFlowers {
+                                returnWithFlowers = false
+                                self.exhibit = .afterFlower
+                            } else {
+                                self.exhibit = nil
+                            }
                         } label: {
-                            Label("纪念馆", systemImage: "chevron.left")
+                            Label(exhibit == .datesDemo && returnWithFlowers ? "结束约会 · 收花" : "纪念馆",
+                                  systemImage: "chevron.left")
                                 .font(.system(size: 15, weight: .medium))
                                 .padding(.horizontal, 13)
                                 .frame(height: 40)
@@ -84,6 +92,11 @@ struct MuseumHomeView: View {
                         guard host.config.isConfigured else { return false }
                         if exhibit == .romance { returnWithFlowers = true }
                         host.open(route: nil)
+                        return true
+                    }, onOpenDemoDates: {
+                        guard exhibit == .romance && !host.config.isConfigured else { return false }
+                        returnWithFlowers = true
+                        self.exhibit = .datesDemo
                         return true
                     }, onOpenBox: { id in
                         guard host.config.isConfigured else { return false }
@@ -374,6 +387,7 @@ private struct MuseumBrowser: UIViewRepresentable {
     let config: HostConfig
     let startURL: URL
     let onOpenLiveDates: () -> Bool
+    let onOpenDemoDates: () -> Bool
     let onOpenBox: (Int) -> Bool
     let onGalleryError: (String) -> Void
 
@@ -383,11 +397,9 @@ private struct MuseumBrowser: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
         if startURL.path == "/museum/romance/" {
-            // Only tell our own wrapper whether a private host is configured;
-            // never expose its URL, bearer credential or cookies to the florist iframe.
-            let available = config.isConfigured ? "true" : "false"
+            // Only expose the embedding platform, never private credentials.
             configuration.userContentController.addUserScript(WKUserScript(
-                source: "window.__MUSEUM_HAS_PRIVATE_DATES__ = " + available + ";",
+                source: "window.__MUSEUM_IN_APP__ = true;",
                 injectionTime: .atDocumentStart,
                 forMainFrameOnly: true
             ))
@@ -477,7 +489,7 @@ private struct MuseumBrowser: UIViewRepresentable {
                 return
             }
             if isMuseumPage(url) {
-                if url.path == "/museum/dates/" && parent.onOpenLiveDates() {
+                if url.path == "/museum/dates/" && (parent.onOpenLiveDates() || parent.onOpenDemoDates()) {
                     decisionHandler(.cancel)
                 } else if url.path == "/museum/gallery/" && parent.config.isConfigured {
                     decisionHandler(.cancel)

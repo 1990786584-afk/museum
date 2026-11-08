@@ -12,17 +12,19 @@ h1{font:normal clamp(23px,5.8vw,37px) Georgia,"Songti SC",serif;line-height:1.5;
 .scene[hidden]{display:none}
 .flower-frame,.date-frame{display:block;width:100%;border:1px solid #b9a998;background:#f3ebdd;border-radius:2px}
 .flower-frame{height:clamp(420px,69dvh,770px)}
-.date-frame{height:clamp(500px,76dvh,830px);background:#fbf6ef}
+.date-frame{height:calc(100dvh - 52px);border:0;background:#fbf6ef}
+.date-exit{height:52px;display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;font:14px Georgia,"Songti SC",serif;color:#4d493e;background:#faf5ee}
+.date-exit:focus-visible{outline:3px solid #846d57;outline-offset:-4px}
+body[data-active-stage="date"]{padding:0;background:#fbf6ef}
+body[data-active-stage="date"] .paper{width:100%;max-width:none;margin:0;padding:0;border:0;box-shadow:none;background:#fbf6ef}
+body[data-active-stage="date"] .eyebrow,body[data-active-stage="date"] footer{display:none}
 .help{font-size:12px;line-height:1.8;opacity:.8;margin:12px 0 18px}
 .paper-button{display:flex;align-items:center;justify-content:center;gap:15px;min-height:50px;padding:10px 16px;margin:17px auto 8px;max-width:380px;background:#f8f1e4;border:1px solid #9e856b;box-shadow:0 2px 7px rgba(70,55,37,.08);font-size:15px;letter-spacing:.07em;text-decoration:none;color:#4d493e}
 .paper-button:focus-visible,.quiet-link:focus-visible{outline:3px solid #846d57;outline-offset:3px}
 .paper-button:hover{background:#f0e5d6}
 .quiet-link{display:inline-block;color:#716250;font-size:13px;margin:8px}
-.envelope{width:min(90%,450px);margin:24px auto 26px}
-.envelope img{display:block;width:100%;max-height:510px;object-fit:contain;filter:sepia(.3) saturate(.7);border:1px solid #c6b39b}
-.envelope figcaption{font:italic 15px "IM Fell",Georgia,serif;padding-top:10px;letter-spacing:.1em}
 footer{border-top:1px solid rgba(125,103,80,.3);margin-top:30px;padding-top:17px;font:italic 15px "IM Fell",Georgia,serif;line-height:1.9}
 footer span{font:normal 10px Georgia,serif;opacity:.7}
 footer a{color:inherit}
-@media(max-width:540px){body{padding:10px}.paper{padding:18px 12px}.flower-frame{height:69dvh;min-height:420px}.date-frame{height:73dvh;min-height:490px}.folio{margin-top:17px}}
+@media(max-width:540px){body{padding:10px}.paper{padding:18px 12px}.flower-frame{height:69dvh;min-height:420px}.date-frame{height:calc(100dvh - 52px);min-height:0}.folio{margin-top:17px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}

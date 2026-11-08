@@ -18,25 +18,37 @@ test("first and second gifts remain distinct valid shareable markers", () => {
 });
 test("only known flow stages are shown", () => {
   assert.equal(stageFromSearch(""), "before");
-  assert.equal(stageFromSearch("?stage=invite"), "invite");
+  assert.equal(stageFromSearch("?stage=invite"), "date"); // Legacy link skips removed page.
   assert.equal(stageFromSearch("?stage=date"), "date");
   assert.equal(stageFromSearch("?stage=after"), "after");
   assert.equal(stageFromSearch("?stage=unknown"), "before");
 });
-test("live private date uses native Ephemera route; public website uses demo", () => {
-  for (const live of [true, false]) {
-    const section = ["before", "invite", "date", "after"].map(name => ({
+test("after the first bouquet, no extra invitation page is interposed", () => {
+  const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../romance/index.html"), "utf8");
+  assert.match(html, /id="goToDate"[^>]*href="\\?stage=date"[^>]*>花收好了/);
+  assert.doesNotMatch(html, /data-stage="invite"/);
+  assert.match(html, /data-stage="date"/);
+  assert.match(html, /id="dateFrame"/);
+});
+test("native goes to standalone Ephemera; browser preview shows full Ephemera home and keeps exit gift", () => {
+  for (const nativeHost of [true, false]) {
+    const sections = ["before", "date", "after"].map(name => ({
       name, hidden: null, getAttribute() { return this.name; }
     }));
-    const nodes = {
-      firstBouquet: {}, lastBouquet: {}, dateFrame: {}, acceptDate: { href: "?stage=date" }
-    };
-    const document = {
-      querySelectorAll() { return section; },
+    const nodes = { firstBouquet: {}, lastBouquet: {}, dateFrame: {}, goToDate: { href: "?stage=date" } };
+    const doc = {
+      body: { dataset: {} },
+      querySelectorAll() { return sections; },
       getElementById(id) { return nodes[id]; }
     };
-    assert.equal(render(document, { search: "?stage=invite" }, live), "invite");
-    assert.deepEqual(section.map(e => e.hidden), [true, false, true, true]);
-    assert.equal(nodes.acceptDate.href, live ? "../dates/" : "?stage=date");
+    assert.equal(render(doc, { search: "" }, nativeHost), "before");
+    assert.equal(nodes.goToDate.href, nativeHost ? "../dates/" : "?stage=date");
+    assert.deepEqual(sections.map(s => s.hidden), [false, true, true]);
+    assert.equal(render(doc, { search: "?stage=date" }, nativeHost), "date");
+    assert.equal(nodes.dateFrame.src, "../dates/");
+    assert.equal(doc.body.dataset.activeStage, "date");
+    assert.deepEqual(sections.map(s => s.hidden), [true, false, true]);
+    assert.equal(render(doc, { search: "?stage=after" }, nativeHost), "after");
+    assert.ok(nodes.lastBouquet.src.includes("#"));
   }
 });
