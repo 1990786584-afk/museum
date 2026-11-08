@@ -23,6 +23,18 @@ class ExhibitionShellTests(unittest.TestCase):
         self.assertIn('EphemeraPage(config: host.config', text)
         self.assertIn('.ignoresSafeArea(edges: .bottom)', text)
 
+    def test_compact_draggable_bookmark_persists_edge_and_height(self):
+        self.assertIn('.frame(width: 23, height: 38)', text)
+        self.assertIn('.frame(width: 44, height: 44)', text)
+        self.assertIn('@AppStorage("museum.bookmark.edge")', text)
+        self.assertIn('@AppStorage("museum.bookmark.verticalFraction")', text)
+        self.assertIn('DragGesture(minimumDistance: 8)', text)
+        self.assertIn('savedFraction = span > 0', text)
+        self.assertIn('savedEdge = newEdge', text)
+        self.assertIn('if !onLeft && expanded { menu }', text)
+        self.assertIn('if onLeft && expanded { menu }', text)
+        self.assertNotIn('.padding(.top, 96)', text)
+
     def test_original_demo_button_and_second_bouquet_routes_survive(self):
         self.assertIn('exhibit = .datesDemo', text)
         self.assertIn('if current == .datesDemo && returnWithFlowers', text)

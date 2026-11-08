@@ -69,7 +69,7 @@ struct MuseumHomeView: View {
                         ? "结束约会 · 收花" : "返回纪念馆") {
                         exitExhibit(exhibit)
                     }
-                    .padding(.top, 96)
+
                 }
             } else {
                 NativeMuseumEntrance(
@@ -157,7 +157,7 @@ struct MuseumHomeView: View {
                         // The existing pageOpen observer decides whether
                         // to show the second bouquet or return to Museum.
                     }
-                    .padding(.top, 96)
+
                 }
         }
     }
@@ -180,82 +180,151 @@ struct MuseumHomeView: View {
 private struct MuseumBookmark: View {
     let exitTitle: String
     let onExit: () -> Void
+
+    // Shared by the Shelf, Ephemera demo and the private date host:
+    // moving the tab in one exhibition also moves it in the others.
+    @AppStorage("museum.bookmark.edge") private var savedEdge = "left"
+    @AppStorage("museum.bookmark.verticalFraction") private var savedFraction = 0.62
+    @GestureState private var dragOffset: CGSize = .zero
     @State private var expanded = false
 
     private let ink = Color(red: 0.30, green: 0.28, blue: 0.23)
     private let paper = Color(red: 0.985, green: 0.965, blue: 0.937)
     private let stroke = Color(red: 0.66, green: 0.58, blue: 0.47)
+    private let menuWidth: CGFloat = 206
+
+    private var onLeft: Bool { savedEdge != "right" }
+
+    // Reserve room for the expanded paper menu and the phone's safe areas.
+    // Use a proportional Y so rotation and other iPhone screen sizes work.
+    private func yBounds(height: CGFloat, topInset: CGFloat, bottomInset: CGFloat) -> ClosedRange<CGFloat> {
+        let minimum = min(max(106, topInset + 68), max(106, height * 0.35))
+        let maximum = max(minimum, height - max(104, bottomInset + 80))
+        return minimum...maximum
+    }
+
+    private func centerY(in range: ClosedRange<CGFloat>) -> CGFloat {
+        range.lowerBound + CGFloat(min(1, max(0, savedFraction))) * (range.upperBound - range.lowerBound)
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 7) {
+        GeometryReader { geometry in
+            let range = yBounds(
+                height: geometry.size.height,
+                topInset: geometry.safeAreaInsets.top,
+                bottomInset: geometry.safeAreaInsets.bottom
+            )
+            let width = expanded ? 44 + 6 + menuWidth : 44
+            let centerX = onLeft ? width / 2 : geometry.size.width - width / 2
+
+            HStack(alignment: .center, spacing: 6) {
+                if !onLeft && expanded { menu }
+
+                handle
+                    .simultaneousGesture(dragGesture(
+                        in: geometry.size,
+                        yRange: range
+                    ))
+
+                if onLeft && expanded { menu }
+            }
+            .frame(width: width, alignment: onLeft ? .leading : .trailing)
+            .position(x: centerX, y: centerY(in: range))
+            .offset(dragOffset)
+        }
+        // GeometryReader is transparent outside its children. Only the tab
+        // and (when opened) the paper menu are interactive.
+        .accessibilityElement(children: .contain)
+    }
+
+    private var handle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.20)) {
+                expanded.toggle()
+            }
+        } label: {
+            ZStack {
+                Capsule()
+                    .fill(paper.opacity(0.84))
+                Capsule()
+                    .strokeBorder(stroke.opacity(0.66), lineWidth: 0.7)
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(ink.opacity(0.88))
+            }
+            // Visible part: only 23 x 38pt; 44pt touch target for accessibility.
+            .frame(width: 23, height: 38)
+            .offset(x: onLeft ? -10 : 10)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(expanded ? "收起纪念馆书签" : "打开纪念馆书签")
+        .accessibilityHint("可上下拖动，拖过屏幕中央可吸附到另一侧；点按展开菜单")
+        .accessibilityIdentifier("museum-bookmark-toggle")
+    }
+
+    private var menu: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("The Museum of Us")
+                .font(.custom("Georgia-Italic", size: 14))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Rectangle()
+                .fill(stroke.opacity(0.32))
+                .frame(height: 0.7)
+
             Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    expanded.toggle()
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    expanded = false
                 }
             } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 15, weight: .light))
-                    Text("馆")
-                        .font(.system(size: 11, design: .serif))
-                }
-                .frame(width: 42, height: 56)
-                .background(paper.opacity(0.94), in: RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(stroke.opacity(0.75), lineWidth: 0.8)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 5, x: 1, y: 3)
+                Label("继续参观", systemImage: "eye")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .accessibilityLabel(expanded ? "收起纪念馆书签" : "打开纪念馆书签")
-            .accessibilityHint("展开返回纪念馆的选项")
-            .accessibilityIdentifier("museum-bookmark-toggle")
+            .accessibilityIdentifier("museum-bookmark-continue")
 
-            if expanded {
-                VStack(alignment: .leading, spacing: 11) {
-                    Text("ZFxF · The Museum of Us")
-                        .font(.custom("Georgia-Italic", size: 15))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Rectangle()
-                        .fill(stroke.opacity(0.35))
-                        .frame(height: 0.7)
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            expanded = false
-                        }
-                    } label: {
-                        Label("继续参观", systemImage: "eye")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .accessibilityIdentifier("museum-bookmark-continue")
-
-                    Button {
-                        expanded = false
-                        onExit()
-                    } label: {
-                        Label(exitTitle, systemImage: "arrow.uturn.backward")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .accessibilityIdentifier("museum-bookmark-exit")
-                }
-                .font(.system(size: 14, design: .serif))
-                .padding(15)
-                .frame(width: 238, alignment: .leading)
-                .background(paper.opacity(0.98), in: RoundedRectangle(cornerRadius: 4))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(stroke.opacity(0.75), lineWidth: 0.8)
-                }
-                .shadow(color: .black.opacity(0.16), radius: 12, x: 1, y: 6)
-                .transition(.opacity.combined(with: .move(edge: .leading)))
+            Button {
+                expanded = false
+                onExit()
+            } label: {
+                Label(exitTitle, systemImage: "arrow.uturn.backward")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityIdentifier("museum-bookmark-exit")
         }
+        .font(.system(size: 13, design: .serif))
+        .padding(13)
+        .frame(width: menuWidth, alignment: .leading)
         .foregroundStyle(ink)
         .buttonStyle(.plain)
-        .accessibilityElement(children: .contain)
+        .background(paper.opacity(0.97), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(stroke.opacity(0.66), lineWidth: 0.7)
+        }
+        .shadow(color: .black.opacity(0.13), radius: 8, x: 1, y: 3)
+        .transition(.opacity.combined(with: .move(edge: onLeft ? .leading : .trailing)))
+    }
+
+    private func dragGesture(in size: CGSize, yRange: ClosedRange<CGFloat>) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($dragOffset) { value, offset, _ in
+                offset = value.translation
+            }
+            .onEnded { value in
+                let newY = min(yRange.upperBound,
+                               max(yRange.lowerBound, centerY(in: yRange) + value.translation.height))
+                let span = yRange.upperBound - yRange.lowerBound
+                let initialX: CGFloat = onLeft ? 22 : size.width - 22
+                let newEdge = initialX + value.translation.width < size.width / 2 ? "left" : "right"
+                withAnimation(.easeOut(duration: 0.20)) {
+                    savedFraction = span > 0 ? Double((newY - yRange.lowerBound) / span) : 0.5
+                    savedEdge = newEdge
+                    expanded = false
+                }
+            }
     }
 }
 
